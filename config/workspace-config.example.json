@@ -1,0 +1,260 @@
+{
+  "version": "1.0.0",
+  "paths": {
+    "projectRoot": "C:/workspace/example-web-app",
+    "worktreesRoot": "worktrees"
+  },
+  "repos": {
+    "backend": {
+      "path": "apps/backend",
+      "envFile": ".env",
+      "envProfiles": {
+        "dev": "apps/backend/.env.dev",
+        "prod": "apps/backend/.env.prod"
+      }
+    },
+    "frontend": {
+      "path": "apps/frontend",
+      "envFile": ".env",
+      "envProfiles": {
+        "dev": "apps/frontend/.env.dev",
+        "prod": "apps/frontend/.env.prod"
+      }
+    }
+  },
+  "commands": {
+    "backend": {
+      "dev": [
+        [
+          "npm",
+          "run",
+          "start:dev"
+        ]
+      ],
+      "prod": [
+        [
+          "npm",
+          "run",
+          "build"
+        ],
+        [
+          "npm",
+          "run",
+          "start:prod"
+        ]
+      ]
+    },
+    "frontend": {
+      "dev": [
+        [
+          "npm",
+          "run",
+          "dev",
+          "--",
+          "--strictPort",
+          "--port",
+          "${ports.frontend}"
+        ]
+      ],
+      "prod": [
+        [
+          "npm",
+          "run",
+          "build"
+        ],
+        [
+          "npm",
+          "run",
+          "start"
+        ]
+      ]
+    }
+  },
+  "git": {
+    "defaults": {
+      "syncSource": "development",
+      "devSource": "development",
+      "mainFlow": {
+        "development": "development",
+        "qa": "qa",
+        "main": "main"
+      }
+    },
+    "targets": {
+      "owner_team_a": {
+        "branch": "owner/team-a",
+        "repoScope": "both",
+        "sourceBranch": "development"
+      },
+      "owner_team_b": {
+        "branch": "owner/team-b",
+        "repoScope": "both",
+        "sourceBranch": "development"
+      },
+      "sub_team_a_1": {
+        "branch": "sub/team-a-1",
+        "repoScope": "both",
+        "sourceBranch": "owner/team-a"
+      },
+      "sub_team_a_2": {
+        "branch": "sub/team-a-2",
+        "repoScope": "both",
+        "sourceBranch": "owner/team-a"
+      },
+      "sub_team_a_3": {
+        "branch": "sub/team-a-3",
+        "repoScope": "both",
+        "sourceBranch": "owner/team-a"
+      },
+      "sub_team_b_1": {
+        "branch": "sub/team-b-1",
+        "repoScope": "both",
+        "sourceBranch": "owner/team-b"
+      },
+      "sub_team_b_2": {
+        "branch": "sub/team-b-2",
+        "repoScope": "both",
+        "sourceBranch": "owner/team-b"
+      },
+      "sub_team_b_3": {
+        "branch": "sub/team-b-3",
+        "repoScope": "both",
+        "sourceBranch": "owner/team-b"
+      },
+      "hotfix": {
+        "branch": "hotfix",
+        "repoScope": "both",
+        "sourceBranch": "main"
+      }
+    },
+    "groups": {
+      "all_team_a": [
+        "owner_team_a",
+        "sub_team_a_1",
+        "sub_team_a_2",
+        "sub_team_a_3"
+      ],
+      "all_team_b": [
+        "owner_team_b",
+        "sub_team_b_1",
+        "sub_team_b_2",
+        "sub_team_b_3"
+      ]
+    }
+  },
+  "deploy": {
+    "targets": {
+      "target_dev": {
+        "gitTarget": "owner_team_a",
+        "envProfile": "dev",
+        "ports": {
+          "backend": 7000,
+          "frontend": 7073
+        }
+      },
+      "target_prod": {
+        "gitTarget": "owner_team_b",
+        "envProfile": "prod",
+        "ports": {
+          "backend": 8000,
+          "frontend": 8073
+        }
+      },
+      "target_hotfix": {
+        "gitTarget": "hotfix",
+        "envProfile": "prod",
+        "ports": {
+          "backend": 9000,
+          "frontend": 9073
+        }
+      },
+      "target_team_a_1": {
+        "gitTarget": "sub_team_a_1",
+        "envProfile": "dev",
+        "ports": {
+          "backend": 7100,
+          "frontend": 7173
+        },
+        "paths": {
+          "backend": "worktrees/combined/team-a-1/backend",
+          "frontend": "worktrees/combined/team-a-1/frontend"
+        }
+      },
+      "target_team_a_2": {
+        "gitTarget": "sub_team_a_2",
+        "envProfile": "dev",
+        "ports": {
+          "backend": 7200,
+          "frontend": 7273
+        },
+        "paths": {
+          "backend": "worktrees/combined/team-a-2/backend",
+          "frontend": "worktrees/combined/team-a-2/frontend"
+        }
+      },
+      "target_team_a_3": {
+        "gitTarget": "sub_team_a_3",
+        "envProfile": "dev",
+        "ports": {
+          "backend": 7300,
+          "frontend": 7373
+        },
+        "paths": {
+          "backend": "worktrees/combined/team-a-3/backend",
+          "frontend": "worktrees/combined/team-a-3/frontend"
+        }
+      },
+      "target_team_b_1": {
+        "gitTarget": "sub_team_b_1",
+        "envProfile": "prod",
+        "ports": {
+          "backend": 8100,
+          "frontend": 8173
+        },
+        "paths": {
+          "backend": "worktrees/combined/team-b-1/backend",
+          "frontend": "worktrees/combined/team-b-1/frontend"
+        }
+      },
+      "target_team_b_2": {
+        "gitTarget": "sub_team_b_2",
+        "envProfile": "prod",
+        "ports": {
+          "backend": 8200,
+          "frontend": 8273
+        },
+        "paths": {
+          "backend": "worktrees/combined/team-b-2/backend",
+          "frontend": "worktrees/combined/team-b-2/frontend"
+        }
+      },
+      "target_team_b_3": {
+        "gitTarget": "sub_team_b_3",
+        "envProfile": "prod",
+        "ports": {
+          "backend": 8300,
+          "frontend": 8373
+        },
+        "paths": {
+          "backend": "worktrees/combined/team-b-3/backend",
+          "frontend": "worktrees/combined/team-b-3/frontend"
+        }
+      }
+    },
+    "envOverrides": {
+      "backend": {
+        "PORT": "${ports.backend}",
+        "APP_CLIENT_URL": "http://localhost:${ports.frontend}",
+        "APP_BASE_URL": "http://localhost:${ports.backend}",
+        "OAUTH_REDIRECT_URI": "http://localhost:${ports.frontend}/oauth/callback"
+      },
+      "frontend": {
+        "PORT": "${ports.frontend}",
+        "API_BASE_URL": "http://localhost:${ports.backend}"
+      }
+    }
+  },
+  "worktrees": {
+    "configPath": "worktrees/config/worktree-config.json"
+  }
+}

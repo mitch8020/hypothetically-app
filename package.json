@@ -1,0 +1,24 @@
+{
+  "name": "workspace-boilerplate-root",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "test": "node --test scripts/*.test.mjs",
+    "config:workspace": "node scripts/populate-workspace-config.mjs",
+    "install": "node scripts/install-workspace.mjs",
+    "i": "npm run install",
+    "blt:backend": "node scripts/run-blt.mjs --target backend",
+    "blt:frontend": "node scripts/run-blt.mjs --target frontend",
+    "git:sync": "node scripts/git-workspace.mjs --workflow sync",
+    "git:merge-dev": "node scripts/git-workspace.mjs --workflow dev",
+    "git:merge-main": "node scripts/git-workspace.mjs --workflow main",
+    "git:sync-all": "node scripts/git-workspace.mjs --workflow sync-all",
+    "git:list-targets": "node scripts/git-workspace.mjs --list-targets",
+    "git:list-groups": "node scripts/git-workspace.mjs --list-groups",
+    "deploy:run": "node scripts/deploy-target.mjs",
+    "deploy": "npm run deploy:run -- --target dev",
+    "verify:workspace": "node scripts/verify-workspace.mjs",
+    "verify:workspace:examples": "node scripts/verify-workspace.mjs --examples-only",
+    "verify:workspace:all": "node scripts/verify-workspace.mjs --with-examples"
+  }
+}

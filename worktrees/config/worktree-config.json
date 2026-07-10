@@ -1,0 +1,50 @@
+{
+  "$schema": "./worktree-config.schema.json",
+  "version": "1.0.0",
+  "paths": {
+    "projectRoot": "<REQUIRED:ABSOLUTE_PROJECT_ROOT>",
+    "worktreesRoot": "worktrees",
+    "bareRoot": "worktrees/.bare",
+    "combinedRoot": "worktrees/combined",
+    "issueBackendRoot": "worktrees/backend",
+    "issueFrontendRoot": "worktrees/frontend"
+  },
+  "defaults": {
+    "developmentBranch": "development",
+    "mainBranch": "main",
+    "defaultEnvProfile": "dev",
+    "mainWorktreeName": "main"
+  },
+  "repos": {
+    "backend": {
+      "barePath": ".bare/<REQUIRED:BACKEND_BARE_REPO_NAME>.git",
+      "dirName": "backend",
+      "envFile": ".env",
+      "envProfiles": {
+        "dev": "<REQUIRED:BACKEND_ENV_DEV_PATH_RELATIVE_TO_PROJECT_ROOT>",
+        "prod": "<REQUIRED:BACKEND_ENV_PROD_PATH_RELATIVE_TO_PROJECT_ROOT>"
+      },
+      "devCommand": ["npm", "run", "start:dev"]
+    },
+    "frontend": {
+      "barePath": ".bare/<REQUIRED:FRONTEND_BARE_REPO_NAME>.git",
+      "dirName": "frontend",
+      "envFile": ".env",
+      "envProfiles": {
+        "dev": "<REQUIRED:FRONTEND_ENV_DEV_PATH_RELATIVE_TO_PROJECT_ROOT>",
+        "prod": "<REQUIRED:FRONTEND_ENV_PROD_PATH_RELATIVE_TO_PROJECT_ROOT>"
+      },
+      "devCommand": ["npm", "run", "dev"]
+    }
+  },
+  "branches": {},
+  "subWorktrees": {},
+  "envOverrides": {
+    "backend": {
+      "PORT": "${ports.backend}"
+    },
+    "frontend": {
+      "PORT": "${ports.frontend}"
+    }
+  }
+}

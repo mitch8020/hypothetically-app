@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Worktree Config",
+  "type": "object",
+  "required": ["version", "paths", "repos", "subWorktrees"],
+  "properties": {
+    "version": { "type": "string" },
+    "paths": {
+      "type": "object",
+      "required": ["projectRoot", "worktreesRoot", "bareRoot", "combinedRoot"],
+      "properties": {
+        "projectRoot": { "type": "string" },
+        "worktreesRoot": { "type": "string" },
+        "bareRoot": { "type": "string" },
+        "combinedRoot": { "type": "string" },
+        "issueBackendRoot": { "type": "string" },
+        "issueFrontendRoot": { "type": "string" }
+      }
+    },
+    "defaults": {
+      "type": "object",
+      "properties": {
+        "developmentBranch": { "type": "string" },
+        "mainBranch": { "type": "string" },
+        "defaultEnvProfile": { "type": "string" },
+        "mainWorktreeName": { "type": "string" }
+      }
+    },
+    "repos": {
+      "type": "object",
+      "properties": {
+        "backend": { "type": "object" },
+        "frontend": { "type": "object" }
+      },
+      "additionalProperties": {
+        "type": "object",
+        "required": ["barePath", "dirName", "envFile", "envProfiles"],
+        "properties": {
+          "barePath": { "type": "string" },
+          "dirName": { "type": "string" },
+          "envFile": { "type": "string" },
+          "envProfiles": {
+            "type": "object",
+            "additionalProperties": { "type": "string" }
+          },
+          "devCommand": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "branches": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "description": { "type": "string" },
+          "parent": { "type": "string" },
+          "workspace": { "type": "string" },
+          "location": { "type": "string" },
+          "envProfile": { "type": "string" },
+          "ports": {
+            "type": "object",
+            "properties": {
+              "backend": { "type": "integer" },
+              "frontend": { "type": "integer" }
+            },
+            "additionalProperties": { "type": "integer" }
+          },
+          "children": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "subWorktrees": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["branch", "parentBranch", "ports"],
+        "properties": {
+          "branch": { "type": "string" },
+          "parentBranch": { "type": "string" },
+          "envProfile": { "type": "string" },
+          "description": { "type": "string" },
+          "ports": {
+            "type": "object",
+            "required": ["backend", "frontend"],
+            "properties": {
+              "backend": { "type": "integer" },
+              "frontend": { "type": "integer" }
+            }
+          }
+        }
+      }
+    },
+    "envOverrides": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": { "type": "string" }
+      }
+    }
+  }
+}

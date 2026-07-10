@@ -1,0 +1,111 @@
+{
+  "version": "1.0.0",
+  "paths": {
+    "projectRoot": "<REQUIRED:ABSOLUTE_PROJECT_ROOT>",
+    "worktreesRoot": "<REQUIRED:WORKTREES_ROOT_RELATIVE_TO_PROJECT_ROOT>"
+  },
+  "repos": {
+    "backend": {
+      "path": "<REQUIRED:BACKEND_REPO_PATH_RELATIVE_TO_PROJECT_ROOT>",
+      "envFile": ".env",
+      "envProfiles": {
+        "dev": "<REQUIRED:BACKEND_ENV_DEV_PATH_RELATIVE_TO_PROJECT_ROOT>",
+        "prod": "<REQUIRED:BACKEND_ENV_PROD_PATH_RELATIVE_TO_PROJECT_ROOT>"
+      }
+    },
+    "frontend": {
+      "path": "<REQUIRED:FRONTEND_REPO_PATH_RELATIVE_TO_PROJECT_ROOT>",
+      "envFile": ".env",
+      "envProfiles": {
+        "dev": "<REQUIRED:FRONTEND_ENV_DEV_PATH_RELATIVE_TO_PROJECT_ROOT>",
+        "prod": "<REQUIRED:FRONTEND_ENV_PROD_PATH_RELATIVE_TO_PROJECT_ROOT>"
+      }
+    }
+  },
+  "commands": {
+    "backend": {
+      "dev": [
+        [
+          "npm",
+          "run",
+          "start:dev"
+        ]
+      ],
+      "prod": [
+        [
+          "npm",
+          "run",
+          "build"
+        ],
+        [
+          "npm",
+          "run",
+          "start:prod"
+        ]
+      ]
+    },
+    "frontend": {
+      "dev": [
+        [
+          "npm",
+          "run",
+          "dev"
+        ]
+      ],
+      "prod": [
+        [
+          "npm",
+          "run",
+          "build"
+        ],
+        [
+          "npm",
+          "run",
+          "start"
+        ]
+      ]
+    }
+  },
+  "git": {
+    "defaults": {
+      "syncSource": "development",
+      "devSource": "development",
+      "mainFlow": {
+        "development": "development",
+        "qa": "qa",
+        "main": "main"
+      }
+    },
+    "targets": {},
+    "groups": {}
+  },
+  "deploy": {
+    "targets": {
+      "dev": {
+        "envProfile": "dev",
+        "ports": {
+          "backend": 7000,
+          "frontend": 7073
+        }
+      },
+      "prod": {
+        "envProfile": "prod",
+        "ports": {
+          "backend": 8000,
+          "frontend": 8073
+        }
+      }
+    },
+    "envOverrides": {
+      "backend": {
+        "PORT": "${ports.backend}"
+      },
+      "frontend": {
+        "PORT": "${ports.frontend}"
+      }
+    }
+  },
+  "worktrees": {
+    "configPath": "worktrees/config/worktree-config.json"
+  }
+}

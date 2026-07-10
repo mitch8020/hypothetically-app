@@ -1,0 +1,163 @@
+{
+  "$schema": "./worktree-config.schema.json",
+  "version": "1.0.0",
+  "paths": {
+    "projectRoot": "C:/workspace/example-web-app",
+    "worktreesRoot": "worktrees",
+    "bareRoot": "worktrees/.bare",
+    "combinedRoot": "worktrees/combined",
+    "issueBackendRoot": "worktrees/backend",
+    "issueFrontendRoot": "worktrees/frontend"
+  },
+  "defaults": {
+    "developmentBranch": "development",
+    "mainBranch": "main",
+    "defaultEnvProfile": "dev",
+    "mainWorktreeName": "main"
+  },
+  "repos": {
+    "backend": {
+      "barePath": ".bare/example-backend.git",
+      "dirName": "backend",
+      "envFile": ".env",
+      "envProfiles": {
+        "dev": "apps/backend/.env.dev",
+        "prod": "apps/backend/.env.prod"
+      },
+      "devCommand": [
+        "npm",
+        "run",
+        "start:dev"
+      ]
+    },
+    "frontend": {
+      "barePath": ".bare/example-frontend.git",
+      "dirName": "frontend",
+      "envFile": ".env",
+      "envProfiles": {
+        "dev": "apps/frontend/.env.dev",
+        "prod": "apps/frontend/.env.prod"
+      },
+      "devCommand": [
+        "npm",
+        "run",
+        "dev"
+      ]
+    }
+  },
+  "branches": {
+    "development": {
+      "description": "Primary integration branch for ongoing changes.",
+      "children": [
+        "owner/team-a",
+        "owner/team-b"
+      ]
+    },
+    "owner/team-a": {
+      "parent": "development",
+      "workspace": "VS Code",
+      "location": "dev",
+      "envProfile": "dev",
+      "ports": {
+        "backend": 7000,
+        "frontend": 7073
+      },
+      "children": [
+        "sub/team-a-1",
+        "sub/team-a-2",
+        "sub/team-a-3"
+      ],
+      "description": "Owner branch for the first collaboration lane."
+    },
+    "owner/team-b": {
+      "parent": "development",
+      "workspace": "Cursor",
+      "location": "prod",
+      "envProfile": "prod",
+      "ports": {
+        "backend": 8000,
+        "frontend": 8073
+      },
+      "children": [
+        "sub/team-b-1",
+        "sub/team-b-2",
+        "sub/team-b-3"
+      ],
+      "description": "Owner branch for the second collaboration lane."
+    }
+  },
+  "subWorktrees": {
+    "team-a-1": {
+      "branch": "sub/team-a-1",
+      "parentBranch": "owner/team-a",
+      "envProfile": "dev",
+      "ports": {
+        "backend": 7100,
+        "frontend": 7173
+      },
+      "description": "Team A parallel slot 1"
+    },
+    "team-a-2": {
+      "branch": "sub/team-a-2",
+      "parentBranch": "owner/team-a",
+      "envProfile": "dev",
+      "ports": {
+        "backend": 7200,
+        "frontend": 7273
+      },
+      "description": "Team A parallel slot 2"
+    },
+    "team-a-3": {
+      "branch": "sub/team-a-3",
+      "parentBranch": "owner/team-a",
+      "envProfile": "dev",
+      "ports": {
+        "backend": 7300,
+        "frontend": 7373
+      },
+      "description": "Team A parallel slot 3"
+    },
+    "team-b-1": {
+      "branch": "sub/team-b-1",
+      "parentBranch": "owner/team-b",
+      "envProfile": "prod",
+      "ports": {
+        "backend": 8100,
+        "frontend": 8173
+      },
+      "description": "Team B parallel slot 1"
+    },
+    "team-b-2": {
+      "branch": "sub/team-b-2",
+      "parentBranch": "owner/team-b",
+      "envProfile": "prod",
+      "ports": {
+        "backend": 8200,
+        "frontend": 8273
+      },
+      "description": "Team B parallel slot 2"
+    },
+    "team-b-3": {
+      "branch": "sub/team-b-3",
+      "parentBranch": "owner/team-b",
+      "envProfile": "prod",
+      "ports": {
+        "backend": 8300,
+        "frontend": 8373
+      },
+      "description": "Team B parallel slot 3"
+    }
+  },
+  "envOverrides": {
+    "backend": {
+      "PORT": "${ports.backend}",
+      "APP_CLIENT_URL": "http://localhost:${ports.frontend}",
+      "APP_BASE_URL": "http://localhost:${ports.backend}",
+      "OAUTH_REDIRECT_URI": "http://localhost:${ports.frontend}/oauth/callback"
+    },
+    "frontend": {
+      "PORT": "${ports.frontend}",
+      "API_BASE_URL": "http://localhost:${ports.backend}"
+    }
+  }
+}
