@@ -96,6 +96,7 @@ This updates `config/workspace-config.json` with:
 - The frontend repo path
 - The worktree root
 - Default `.env.dev` and `.env.prod` paths for both repos
+- Blank `.env.dev` and `.env.prod` files when those files do not already exist
 - Default `dev` and `prod` deploy targets, using ports `7000`/`7073` and `8000`/`8073`
 
 If your repos are not in the default folders, pass them explicitly:
@@ -110,16 +111,16 @@ To preview the generated config without writing it:
 npm run config:workspace -- --dry-run
 ```
 
-## Step 5: Create Environment Files
+## Step 5: Fill In Environment Files
 
-The generated config points to these default files:
+The config command creates these files when they do not already exist:
 
 - Backend dev: `[backend-path]/.env.dev`
 - Backend prod: `[backend-path]/.env.prod`
 - Frontend dev: `[frontend-path]/.env.dev`
 - Frontend prod: `[frontend-path]/.env.prod`
 
-Create the files your apps need. The deploy command can also inject port-related values from `deploy.envOverrides` in `config/workspace-config.json`.
+Existing files are never overwritten. Add the variables your apps need to the blank files. The deploy command can also inject port-related values from `deploy.envOverrides` in `config/workspace-config.json`.
 
 ## Step 6: Install Dependencies
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -189,6 +189,26 @@ function profilePath(repoRelPath, profile) {
   return slash(path.posix.join(repoRelPath, `.env.${profile}`));
 }
 
+function envFileState(filePath) {
+  if (!existsSync(filePath)) return "missing";
+  if (!statSync(filePath).isFile()) {
+    throw new Error(`Required env path is not a file: ${configPathFor(filePath)}`);
+  }
+  return "existing";
+}
+
+function createBlankEnvFile(filePath) {
+  if (envFileState(filePath) === "existing") return false;
+
+  try {
+    writeFileSync(filePath, "", { flag: "wx" });
+    return true;
+  } catch (error) {
+    if (error.code === "EEXIST" && envFileState(filePath) === "existing") return false;
+    throw error;
+  }
+}
+
 function ensureConfigShape(config) {
   config.paths ??= {};
   config.repos ??= {};
@@ -251,6 +271,13 @@ try {
   config.repos.frontend.envProfiles.dev = profilePath(frontendRelPath, "dev");
   config.repos.frontend.envProfiles.prod = profilePath(frontendRelPath, "prod");
 
+  const envFiles = [
+    path.join(backendPath, ".env.dev"),
+    path.join(backendPath, ".env.prod"),
+    path.join(frontendPath, ".env.dev"),
+    path.join(frontendPath, ".env.prod"),
+  ];
+  const envFileStates = envFiles.map((filePath) => envFileState(filePath));
   const nextJson = `${JSON.stringify(config, null, 2)}\n`;
 
   if (options.dryRun) {
@@ -258,6 +285,17 @@ try {
   } else {
     writeFileSync(configPath, nextJson);
     console.log(`[config] Updated ${configPathFor(configPath)}`);
+  }
+
+  for (const [index, filePath] of envFiles.entries()) {
+    const displayPath = configPathFor(filePath);
+    if (options.dryRun) {
+      const action = envFileStates[index] === "missing" ? "create" : "keep";
+      console.log(`[config] Would ${action} ${displayPath}`);
+    } else {
+      const created = createBlankEnvFile(filePath);
+      console.log(`[config] ${created ? "Created" : "Kept"} ${displayPath}`);
+    }
   }
 
   console.log(`[config] paths.projectRoot = ${config.paths.projectRoot}`);
