@@ -65,7 +65,11 @@
         [
           "npm",
           "run",
-          "start"
+          "preview",
+          "--",
+          "--strictPort",
+          "--port",
+          "${ports.frontend}"
         ]
       ]
     }

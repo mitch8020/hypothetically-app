@@ -1,15 +1,14 @@
 # Workspace Boilerplate
 
-This repository is a workspace-level command and worktree toolkit for a two-repo web application: one backend repo and one frontend repo. The root directory is not the app itself. It coordinates configuration, installs, git workflows, deploy targets, and worktree helpers for the app repos you place inside it.
+This repository is a workspace-level command and worktree toolkit for a two-repo web application: one Nest backend repo and one Vite frontend repo. The root directory coordinates scaffolding, configuration, installs, git workflows, deploy targets, and worktree helpers.
 
 ## Prerequisites
 
 - Node.js and npm
 - Git
 - PowerShell if you use the scripts in `worktrees/scripts`
-- A backend npm project and a frontend npm project, either existing repos or new repos you scaffold
 
-Do not start by running `npm install` in the workspace root. The root `install` script installs dependencies inside the configured backend and frontend repos, so those repos and `config/workspace-config.json` need to exist first.
+Do not start by running `npm install` in the workspace root. Start with `npm run config:workspace`; it creates and installs the child applications.
 
 ## Step 1: Copy This Boilerplate
 
@@ -25,63 +24,9 @@ The default repo folders are:
 - `[app]-backend`
 - `[app]-frontend`
 
-You can keep those names, rename them, or use a layout like `apps/backend` and `apps/frontend`. If you rename them, pass the paths when you generate the workspace config in Step 4.
+The config command replaces these placeholders with `<project-name>-backend` and `<project-name>-frontend`. You can also place existing npm repos in the workspace; pass their paths when running the config command.
 
-## Step 2: Instantiate The Backend Repo
-
-Use one of these options.
-
-Option A, clone an existing backend repo:
-
-```powershell
-git clone <backend-repo-url> "[app]-backend"
-```
-
-Option B, create a new backend repo in the placeholder folder:
-
-```powershell
-Set-Location -LiteralPath ".\[app]-backend"
-git init
-npm init -y
-Set-Location -LiteralPath ".."
-```
-
-The default workspace commands expect the backend `package.json` to provide:
-
-- `npm run start:dev`
-- `npm run build`
-- `npm run start:prod`
-
-If your backend uses different script names, update `commands.backend` in `config/workspace-config.json` after Step 4.
-
-## Step 3: Instantiate The Frontend Repo
-
-Use one of these options.
-
-Option A, clone an existing frontend repo:
-
-```powershell
-git clone <frontend-repo-url> "[app]-frontend"
-```
-
-Option B, create a new frontend repo in the placeholder folder:
-
-```powershell
-Set-Location -LiteralPath ".\[app]-frontend"
-git init
-npm init -y
-Set-Location -LiteralPath ".."
-```
-
-The default workspace commands expect the frontend `package.json` to provide:
-
-- `npm run dev`
-- `npm run build`
-- `npm run start`
-
-If your frontend uses different script names, update `commands.frontend` in `config/workspace-config.json` after Step 4.
-
-## Step 4: Generate The Workspace Config
+## Step 2: Scaffold And Configure The Apps
 
 Run the config command from the workspace root:
 
@@ -89,15 +34,32 @@ Run the config command from the workspace root:
 npm run config:workspace
 ```
 
+The command prompts for:
+
+- The project name, which is normalized to a package-safe slug
+- The frontend development port
+- The backend development port
+
+For empty placeholders or missing repos, the command:
+
+- Runs `npm create vite@latest <project-slug>-frontend -- --template react-ts --no-interactive`
+- Installs the Vite dependencies and initializes its Git repo
+- Runs `nest new <project-slug>-backend` through `npx @nestjs/cli@latest`, using npm and strict TypeScript
+- Initializes the Nest Git repo
+- Preserves any existing `.env`, `.env.dev`, and `.env.prod` placeholder files
+
+If valid npm repos already exist, the command keeps their application code and updates the folder/package names only when they still use `[app]` placeholders.
+
 This updates `config/workspace-config.json` with:
 
+- The project name and slug
 - The absolute project root
 - The backend repo path
 - The frontend repo path
 - The worktree root
 - Default `.env.dev` and `.env.prod` paths for both repos
 - Blank `.env.dev` and `.env.prod` files when those files do not already exist
-- Default `dev` and `prod` deploy targets, using ports `7000`/`7073` and `8000`/`8073`
+- A `dev` deploy target using the selected ports, plus the default `prod` target using `8000`/`8073`
 
 If your repos are not in the default folders, pass them explicitly:
 
@@ -105,13 +67,21 @@ If your repos are not in the default folders, pass them explicitly:
 npm run config:workspace -- --backend .\apps\backend --frontend .\apps\frontend
 ```
 
-To preview the generated config without writing it:
+For automation, provide every value and disable prompts:
+
+```powershell
+npm run config:workspace -- --project-name "My Web App" --frontend-port 5173 --backend-port 5000 --non-interactive
+```
+
+To preview the config and scaffold commands without writing or creating anything:
 
 ```powershell
 npm run config:workspace -- --dry-run
 ```
 
-## Step 5: Fill In Environment Files
+Deployment validates both child `package.json` files and required npm scripts before starting processes, preventing npm from walking up and accidentally using the workspace root package.
+
+## Step 3: Fill In Environment Files
 
 The config command creates these files when they do not already exist:
 
@@ -122,9 +92,9 @@ The config command creates these files when they do not already exist:
 
 Existing files are never overwritten. Add the variables your apps need to the blank files. The deploy command can also inject port-related values from `deploy.envOverrides` in `config/workspace-config.json`.
 
-## Step 6: Install Dependencies
+## Step 4: Install Dependencies When Needed
 
-After the config points to real repos, install dependencies for both app repos:
+Newly scaffolded apps are installed automatically. To reinstall both repos later, run:
 
 ```powershell
 npm run install
@@ -132,7 +102,7 @@ npm run install
 
 This runs `npm install` inside the configured backend and frontend directories. You can also install inside each repo manually if you prefer.
 
-## Step 7: Verify The Workspace
+## Step 5: Verify The Workspace
 
 Run:
 
@@ -147,7 +117,7 @@ Expected early warnings are:
 
 Those are normal until you configure git workflows. The config command creates default `dev` and `prod` deploy targets that you can customize.
 
-## Step 8: Configure Git And Deploy Targets
+## Step 6: Configure Git And Deploy Targets
 
 Edit `config/workspace-config.json` when you are ready to use workspace git or deploy commands.
 
@@ -189,6 +159,8 @@ Use `deploy.targets` to customize local run targets. The generated config starts
 }
 ```
 
+`npm run deploy` copies each selected env profile to `.env`, applies configured overrides, exports those values to the matching child process, starts the backend, waits for its selected port to accept connections, and then starts the frontend. Stopping the root deploy command stops both process trees.
+
 For a complete reference, compare against:
 
 - `config/workspace-config.example.json`
@@ -197,6 +169,7 @@ For a complete reference, compare against:
 ## Common Commands
 
 - `npm run config:workspace`
+- `npm run config:workspace -- --project-name "<name>" --frontend-port <port> --backend-port <port> --non-interactive`
 - `npm run config:workspace -- --dry-run`
 - `npm run install`
 - `npm run verify:workspace`

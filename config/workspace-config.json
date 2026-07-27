@@ -1,24 +1,24 @@
 {
   "version": "1.0.0",
   "paths": {
-    "projectRoot": "<REQUIRED:ABSOLUTE_PROJECT_ROOT>",
-    "worktreesRoot": "<REQUIRED:WORKTREES_ROOT_RELATIVE_TO_PROJECT_ROOT>"
+    "projectRoot": "C:/Projects/Hypothetically App/hypothetically-app",
+    "worktreesRoot": "worktrees"
   },
   "repos": {
     "backend": {
-      "path": "<REQUIRED:BACKEND_REPO_PATH_RELATIVE_TO_PROJECT_ROOT>",
+      "path": "hypothetically-app-backend",
       "envFile": ".env",
       "envProfiles": {
-        "dev": "<REQUIRED:BACKEND_ENV_DEV_PATH_RELATIVE_TO_PROJECT_ROOT>",
-        "prod": "<REQUIRED:BACKEND_ENV_PROD_PATH_RELATIVE_TO_PROJECT_ROOT>"
+        "dev": "hypothetically-app-backend/.env.dev",
+        "prod": "hypothetically-app-backend/.env.prod"
       }
     },
     "frontend": {
-      "path": "<REQUIRED:FRONTEND_REPO_PATH_RELATIVE_TO_PROJECT_ROOT>",
+      "path": "hypothetically-app-frontend",
       "envFile": ".env",
       "envProfiles": {
-        "dev": "<REQUIRED:FRONTEND_ENV_DEV_PATH_RELATIVE_TO_PROJECT_ROOT>",
-        "prod": "<REQUIRED:FRONTEND_ENV_PROD_PATH_RELATIVE_TO_PROJECT_ROOT>"
+        "dev": "hypothetically-app-frontend/.env.dev",
+        "prod": "hypothetically-app-frontend/.env.prod"
       }
     }
   },
@@ -49,7 +49,11 @@
         [
           "npm",
           "run",
-          "dev"
+          "dev",
+          "--",
+          "--strictPort",
+          "--port",
+          "${ports.frontend}"
         ]
       ],
       "prod": [
@@ -61,7 +65,11 @@
         [
           "npm",
           "run",
-          "start"
+          "preview",
+          "--",
+          "--strictPort",
+          "--port",
+          "${ports.frontend}"
         ]
       ]
     }
@@ -107,5 +115,9 @@
   },
   "worktrees": {
     "configPath": "worktrees/config/worktree-config.json"
+  },
+  "project": {
+    "name": "Hypothetically App",
+    "slug": "hypothetically-app"
   }
 }
