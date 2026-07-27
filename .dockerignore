@@ -1,0 +1,13 @@
+.git
+**/.git
+**/node_modules
+**/dist
+**/coverage
+**/.env
+**/.env.*
+.claude
+config
+scripts
+worktrees
+*.md
+*.log

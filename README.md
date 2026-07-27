@@ -2,6 +2,64 @@
 
 This repository is a workspace-level command and worktree toolkit for a two-repo web application: one Nest backend repo and one Vite frontend repo. The root directory coordinates scaffolding, configuration, installs, git workflows, deploy targets, and worktree helpers.
 
+## Heroku Docker Deployment
+
+The production image builds both child applications and runs them as one Heroku
+web process. Nest listens on Heroku's `PORT`, serves the React build at `/`, and
+serves the backend at `/api/*`.
+
+Prerequisites:
+
+- Docker is running.
+- The Heroku CLI is installed and authenticated.
+- The Heroku app uses the `container` stack.
+
+Build and verify locally:
+
+```powershell
+docker build --tag hypothetically-app:local .
+docker run --rm --publish 3000:3000 --env PORT=3000 hypothetically-app:local
+```
+
+Then open `http://localhost:3000` and
+`http://localhost:3000/api/health`.
+
+Deploy the same image layout to Heroku:
+
+```powershell
+heroku container:login
+heroku stack:set container --app hypothetically-app
+docker buildx build `
+  --platform linux/amd64 `
+  --provenance=false `
+  --output "type=registry,name=registry.heroku.com/hypothetically-app/web,oci-mediatypes=false" `
+  .
+heroku container:release web --app hypothetically-app
+heroku ps:scale web=1:Eco --app hypothetically-app
+```
+
+The explicit Buildx output is important with current Docker Desktop versions:
+Heroku's registry accepts Docker Image Manifest V2 Schema 2, not OCI manifests
+or provenance indexes. The command builds Linux/amd64, disables the provenance
+index, and pushes Docker media types directly.
+
+Set these Heroku config vars before the first release:
+
+- `NODE_ENV=production`
+- `FRONTEND_URL=https://<your-heroku-host>` without a trailing slash
+- `GOOGLE_CALLBACK_URL=https://<your-heroku-host>/api/auth/google/callback`
+- `MONGODB_URI`
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `SESSION_SECRET` with at least 32 characters
+
+Add the same `GOOGLE_CALLBACK_URL` to the Google OAuth client's authorized
+redirect URIs. Never commit these values; `.dockerignore` excludes environment
+files from every image stage.
+
+The included `heroku.yml` also supports container-stack Git deployments. The
+Dockerfile `CMD` is the web process command.
+
 ## Prerequisites
 
 - Node.js and npm
