@@ -5,8 +5,7 @@ FROM node:24-bookworm-slim AS frontend-dependencies
 WORKDIR /build/frontend
 
 COPY hypothetically-app-frontend/package.json hypothetically-app-frontend/package-lock.json ./
-RUN --mount=type=cache,target=/root/.npm \
-    npm ci --no-audit --no-fund --prefer-offline \
+RUN npm ci --no-audit --no-fund --prefer-offline \
       --fetch-retries=5 \
       --fetch-retry-mintimeout=20000 \
       --fetch-retry-maxtimeout=120000
@@ -25,8 +24,7 @@ FROM frontend-dependencies AS backend-build
 WORKDIR /build/backend
 
 COPY hypothetically-app-backend/package.json hypothetically-app-backend/package-lock.json ./
-RUN --mount=type=cache,target=/root/.npm \
-    npm ci --no-audit --no-fund --prefer-offline \
+RUN npm ci --no-audit --no-fund --prefer-offline \
       --fetch-retries=5 \
       --fetch-retry-mintimeout=20000 \
       --fetch-retry-maxtimeout=120000
