@@ -8,6 +8,7 @@ const validEnvironment = {
   GOOGLE_CALLBACK_URL: 'http://localhost:7000/api/auth/google/callback',
   FRONTEND_URL: 'http://localhost:7073',
   SESSION_SECRET: 'a-session-secret-that-is-at-least-32-characters',
+  OPENAI_API_KEY: 'test-openai-key',
 };
 
 describe('environment validation', () => {
@@ -22,6 +23,7 @@ describe('environment validation', () => {
       expect.objectContaining({
         PORT: 7001,
         MONGODB_DNS_SERVERS: '1.1.1.1,8.8.8.8',
+        APP_TIME_ZONE: 'America/Chicago',
       }),
     );
   });
@@ -45,5 +47,11 @@ describe('environment validation', () => {
         MONGODB_DNS_SERVERS: 'not-an-ip',
       }),
     ).toThrow('MONGODB_DNS_SERVERS');
+    expect(() =>
+      validateEnvironment({
+        ...validEnvironment,
+        APP_TIME_ZONE: 'Central-ish',
+      }),
+    ).toThrow('APP_TIME_ZONE');
   });
 });

@@ -1,4 +1,8 @@
 import { isIP } from 'node:net';
+import {
+  assertTimeZone,
+  DEFAULT_QUESTION_TIME_ZONE,
+} from '../questions/question-day';
 
 const LOCAL_FRONTEND_URL = 'http://localhost:7073';
 const LOCAL_GOOGLE_CALLBACK_URL =
@@ -78,6 +82,9 @@ export function validateEnvironment(environment: Environment): Environment {
       'GOOGLE_CALLBACK_URL',
     ),
     SESSION_SECRET: requiredString(environment, 'SESSION_SECRET', 32),
+    APP_TIME_ZONE: assertTimeZone(
+      optionalString(environment.APP_TIME_ZONE, DEFAULT_QUESTION_TIME_ZONE),
+    ),
     ...(mongodbDnsServers ? { MONGODB_DNS_SERVERS: mongodbDnsServers } : {}),
   };
 
@@ -90,6 +97,7 @@ export function validateEnvironment(environment: Environment): Environment {
       environment,
       'GOOGLE_CLIENT_SECRET',
     );
+    validated.OPENAI_API_KEY = requiredString(environment, 'OPENAI_API_KEY');
   } else {
     validated.GOOGLE_CLIENT_ID = optionalString(
       environment.GOOGLE_CLIENT_ID,
@@ -98,6 +106,10 @@ export function validateEnvironment(environment: Environment): Environment {
     validated.GOOGLE_CLIENT_SECRET = optionalString(
       environment.GOOGLE_CLIENT_SECRET,
       'test-google-secret',
+    );
+    validated.OPENAI_API_KEY = optionalString(
+      environment.OPENAI_API_KEY,
+      'test-openai-key',
     );
   }
 

@@ -21,13 +21,35 @@ export class QuestionsController {
 
   @Get('random')
   async random(
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<PublicQuestion | undefined> {
+    const question = await this.questionsService.findTodayQuestion();
+    if (!question) {
+      response.status(204);
+      return undefined;
+    }
+    response.setHeader('Cache-Control', 'no-store');
+    return question;
+  }
+
+  @Get('today')
+  async today(
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<PublicQuestion> {
+    response.setHeader('Cache-Control', 'no-store');
+    return this.questionsService.findTodayQuestion();
+  }
+
+  @Get('previous-unanswered')
+  @UseGuards(SessionAuthGuard)
+  async previousUnanswered(
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
-    @Query('exclude') exclude?: string,
+    @Query('before') before?: string,
   ): Promise<PublicQuestion | undefined> {
-    const question = await this.questionsService.findRandomQuestion(
-      request.user?._id,
-      exclude,
+    const question = await this.questionsService.findPreviousUnansweredQuestion(
+      request.user!,
+      before,
     );
     if (!question) {
       response.status(204);

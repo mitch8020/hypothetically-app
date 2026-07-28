@@ -52,6 +52,8 @@ Set these Heroku config vars before the first release:
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
 - `SESSION_SECRET` with at least 32 characters
+- `OPENAI_API_KEY`
+- `APP_TIME_ZONE=America/Chicago`
 
 Add the same `GOOGLE_CALLBACK_URL` to the Google OAuth client's authorized
 redirect URIs. Never commit these values; `.dockerignore` excludes environment

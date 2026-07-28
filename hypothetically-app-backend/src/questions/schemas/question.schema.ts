@@ -28,6 +28,34 @@ export class Question {
 
   @Prop({ required: true, default: true, index: true })
   active!: boolean;
+
+  @Prop()
+  dayKey?: string;
+
+  @Prop({ enum: ['catalog', 'gpt'] })
+  source?: 'catalog' | 'gpt';
+
+  @Prop({ min: 1, immutable: true })
+  requiredAnswerCount?: number;
+
+  @Prop()
+  generationModel?: string;
+
+  @Prop()
+  generationResponseId?: string;
+
+  @Prop()
+  promptVersion?: string;
+
+  @Prop()
+  generatedAt?: Date;
 }
 
 export const QuestionSchema = SchemaFactory.createForClass(Question);
+QuestionSchema.index(
+  { dayKey: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { dayKey: { $type: 'string' } },
+  },
+);
