@@ -10,13 +10,13 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
-import { Cron } from '@nestjs/schedule';
 import { Model, Types } from 'mongoose';
 import { User } from '../users/schemas/user.schema';
 import { QUESTION_CATALOG } from './question.catalog';
 import { validateGeneratedQuestion } from './question-candidate';
 import {
   DEFAULT_QUESTION_TIME_ZONE,
+  isQuestionGenerationHour,
   previousQuestionDay,
   questionDayKey,
   requiredAnswerCount,
@@ -75,7 +75,9 @@ export class QuestionsService implements OnApplicationBootstrap {
   }
 
   onApplicationBootstrap(): void {
-    if (this.isTest) return;
+    if (this.isTest || process.env.DAILY_QUESTION_SCHEDULER_RUN === 'true') {
+      return;
+    }
     void this.ensureTodayQuestion().catch((error: unknown) => {
       this.logger.warn(
         `Daily question bootstrap is waiting for a retry: ${this.errorCode(error)}`,
@@ -83,19 +85,23 @@ export class QuestionsService implements OnApplicationBootstrap {
     });
   }
 
-  @Cron('0 0 0 * * *', {
-    name: 'daily-question',
-    timeZone: process.env.APP_TIME_ZONE ?? DEFAULT_QUESTION_TIME_ZONE,
-    waitForCompletion: true,
-  })
-  async generateAtMidnight(): Promise<void> {
-    try {
-      await this.ensureTodayQuestion();
-    } catch (error) {
-      this.logger.warn(
-        `Midnight question generation is waiting for a retry: ${this.errorCode(error)}`,
+  async generateFromScheduler(
+    now = new Date(),
+    force = false,
+  ): Promise<
+    | { status: 'ready'; question: PublicQuestion }
+    | { status: 'skipped'; dayKey: string }
+  > {
+    const dayKey = questionDayKey(now, this.timeZone);
+    if (!force && !isQuestionGenerationHour(now, this.timeZone)) {
+      this.logger.log(
+        `Skipping the ${dayKey} Scheduler run outside the local midnight hour.`,
       );
+      return { status: 'skipped', dayKey };
     }
+    const question = this.toPublicQuestion(await this.ensureTodayQuestion(now));
+    this.logger.log(`Daily question is ready for ${dayKey}.`);
+    return { status: 'ready', question };
   }
 
   toPublicQuestion(question: Question): PublicQuestion {

@@ -191,6 +191,27 @@ describe('QuestionsService integration', () => {
     ).resolves.toMatchObject({ requiredAnswerCount: 3 });
   });
 
+  it('runs only the Heroku Scheduler invocation in the Central midnight hour', async () => {
+    await expect(
+      service.generateFromScheduler(new Date('2026-07-28T06:10:00.000Z')),
+    ).resolves.toEqual({
+      status: 'skipped',
+      dayKey: '2026-07-28',
+    });
+    expect(generate).not.toHaveBeenCalled();
+
+    await expect(
+      service.generateFromScheduler(new Date('2026-07-28T05:10:00.000Z')),
+    ).resolves.toMatchObject({
+      status: 'ready',
+      question: {
+        key: 'daily-2026-07-28',
+        dayKey: '2026-07-28',
+      },
+    });
+    expect(generate).toHaveBeenCalledTimes(1);
+  });
+
   it('rejects a copied example and retries with a distinct candidate', async () => {
     generate
       .mockResolvedValueOnce({

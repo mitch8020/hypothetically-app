@@ -62,6 +62,29 @@ files from every image stage.
 The included `heroku.yml` also supports container-stack Git deployments. The
 Dockerfile `CMD` is the web process command.
 
+### Daily question scheduling on Eco
+
+The web dyno does not keep an in-process cron timer. Provision the free Heroku
+Scheduler add-on and open its dashboard:
+
+```powershell
+heroku addons:create scheduler:standard --app hypothetically-app
+heroku addons:open scheduler --app hypothetically-app
+```
+
+Add two daily jobs with the same command:
+
+```text
+npm run scheduler:daily-question
+```
+
+Schedule one at `05:10 UTC` and the other at `06:10 UTC`. Heroku Scheduler uses
+UTC and does not adjust daily job times for daylight saving time. The command
+checks `APP_TIME_ZONE`; only the job that lands during the Central-time midnight
+hour prepares the question, while the other exits without generating anything.
+The Mongo generation lease makes a repeated run safe, and web startup plus
+`GET /api/questions/today` remain fallbacks if Scheduler misses a run.
+
 ## Prerequisites
 
 - Node.js and npm

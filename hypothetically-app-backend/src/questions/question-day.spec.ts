@@ -1,4 +1,5 @@
 import {
+  isQuestionGenerationHour,
   previousQuestionDay,
   questionDayKey,
   requiredAnswerCount,
@@ -18,6 +19,33 @@ describe('question day rules', () => {
     expect(
       questionDayKey(new Date('2026-11-01T05:00:00.000Z'), 'America/Chicago'),
     ).toBe('2026-11-01');
+  });
+
+  it('selects the correct UTC Scheduler run before and after DST', () => {
+    expect(
+      isQuestionGenerationHour(
+        new Date('2026-07-28T05:10:00.000Z'),
+        'America/Chicago',
+      ),
+    ).toBe(true);
+    expect(
+      isQuestionGenerationHour(
+        new Date('2026-07-28T06:10:00.000Z'),
+        'America/Chicago',
+      ),
+    ).toBe(false);
+    expect(
+      isQuestionGenerationHour(
+        new Date('2026-12-15T05:10:00.000Z'),
+        'America/Chicago',
+      ),
+    ).toBe(false);
+    expect(
+      isQuestionGenerationHour(
+        new Date('2026-12-15T06:10:00.000Z'),
+        'America/Chicago',
+      ),
+    ).toBe(true);
   });
 
   it('moves backward by calendar day and validates thresholds', () => {
