@@ -193,7 +193,7 @@ describe('QuestionsService integration', () => {
 
   it('runs only the Heroku Scheduler invocation in the Central midnight hour', async () => {
     await expect(
-      service.generateFromScheduler(new Date('2026-07-28T06:10:00.000Z')),
+      service.generateFromScheduler(new Date('2026-07-28T06:00:00.000Z')),
     ).resolves.toEqual({
       status: 'skipped',
       dayKey: '2026-07-28',
@@ -201,7 +201,7 @@ describe('QuestionsService integration', () => {
     expect(generate).not.toHaveBeenCalled();
 
     await expect(
-      service.generateFromScheduler(new Date('2026-07-28T05:10:00.000Z')),
+      service.generateFromScheduler(new Date('2026-07-28T05:00:00.000Z')),
     ).resolves.toMatchObject({
       status: 'ready',
       question: {

@@ -75,10 +75,10 @@ heroku addons:open scheduler --app hypothetically-app
 Add two daily jobs with the same command:
 
 ```text
-npm run scheduler:daily-question
+node dist/generate-daily-question.js
 ```
 
-Schedule one at `05:10 UTC` and the other at `06:10 UTC`. Heroku Scheduler uses
+Schedule one at `05:00 UTC` and the other at `06:00 UTC`. Heroku Scheduler uses
 UTC and does not adjust daily job times for daylight saving time. The command
 checks `APP_TIME_ZONE`; only the job that lands during the Central-time midnight
 hour prepares the question, while the other exits without generating anything.

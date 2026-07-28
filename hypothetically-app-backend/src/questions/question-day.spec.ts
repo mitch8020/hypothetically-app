@@ -24,25 +24,25 @@ describe('question day rules', () => {
   it('selects the correct UTC Scheduler run before and after DST', () => {
     expect(
       isQuestionGenerationHour(
-        new Date('2026-07-28T05:10:00.000Z'),
+        new Date('2026-07-28T05:00:00.000Z'),
         'America/Chicago',
       ),
     ).toBe(true);
     expect(
       isQuestionGenerationHour(
-        new Date('2026-07-28T06:10:00.000Z'),
+        new Date('2026-07-28T06:00:00.000Z'),
         'America/Chicago',
       ),
     ).toBe(false);
     expect(
       isQuestionGenerationHour(
-        new Date('2026-12-15T05:10:00.000Z'),
+        new Date('2026-12-15T05:00:00.000Z'),
         'America/Chicago',
       ),
     ).toBe(false);
     expect(
       isQuestionGenerationHour(
-        new Date('2026-12-15T06:10:00.000Z'),
+        new Date('2026-12-15T06:00:00.000Z'),
         'America/Chicago',
       ),
     ).toBe(true);
