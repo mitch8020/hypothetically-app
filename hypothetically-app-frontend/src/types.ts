@@ -13,6 +13,7 @@ export interface PublicQuestion {
   maximum: number
   step: number
   precision: number
+  dayKey?: string
 }
 
 export interface LeaderboardEntry {
@@ -24,12 +25,26 @@ export interface LeaderboardEntry {
   isCurrentUser: boolean
 }
 
-export interface QuestionResult {
+export interface LockedQuestionResult {
+  status: 'locked'
+  question: PublicQuestion
+  userAnswer: number
+  answerCount: number
+  requiredAnswerCount: number
+  remainingAnswerCount: number
+}
+
+export interface UnlockedQuestionResult {
+  status: 'unlocked'
   question: PublicQuestion
   average: number
   answerCount: number
+  requiredAnswerCount: number
+  remainingAnswerCount: 0
   leaders: LeaderboardEntry[]
   userEntry: LeaderboardEntry & { distanceToWinner: number }
   winningEntry: LeaderboardEntry
   computedAt: string
 }
+
+export type QuestionResult = LockedQuestionResult | UnlockedQuestionResult

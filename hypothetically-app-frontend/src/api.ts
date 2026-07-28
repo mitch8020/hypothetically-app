@@ -63,13 +63,25 @@ export async function signOut(): Promise<void> {
   await request('/api/auth/logout', { method: 'POST' })
 }
 
-export async function getRandomQuestion(
-  exclude?: string,
+export async function recordVisit(): Promise<void> {
+  await request('/api/traffic/visit', { method: 'POST' })
+}
+
+export async function getTodayQuestion(): Promise<PublicQuestion> {
+  const question = await request<PublicQuestion>('/api/questions/today')
+  if (!question) {
+    throw new ApiError('Today’s question is still being prepared.', 503)
+  }
+  return question
+}
+
+export async function getPreviousUnansweredQuestion(
+  before?: string,
 ): Promise<PublicQuestion | null> {
-  const search = exclude
-    ? `?exclude=${encodeURIComponent(exclude)}`
-    : ''
-  return request<PublicQuestion>(`/api/questions/random${search}`)
+  const search = before ? `?before=${encodeURIComponent(before)}` : ''
+  return request<PublicQuestion>(
+    `/api/questions/previous-unanswered${search}`,
+  )
 }
 
 export async function getQuestion(key: string): Promise<PublicQuestion> {

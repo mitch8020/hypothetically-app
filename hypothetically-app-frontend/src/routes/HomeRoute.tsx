@@ -1,18 +1,16 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect } from 'react'
-import { useNavigate, useSearchParams } from 'react-router'
-import { getRandomQuestion } from '../api'
-import { EmptyState, ErrorState, LoadingState } from './StateRoutes'
+import { useNavigate } from 'react-router'
+import { getTodayQuestion } from '../api'
+import { ErrorState, LoadingState } from './StateRoutes'
 
 export function HomeRoute() {
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
-  const exclude = searchParams.get('exclude') ?? undefined
   const questionQuery = useQuery({
-    queryKey: ['random-question', exclude ?? 'none'],
-    queryFn: () => getRandomQuestion(exclude),
+    queryKey: ['today-question'],
+    queryFn: getTodayQuestion,
     staleTime: 0,
-    retry: 1,
+    retry: false,
   })
 
   useEffect(() => {
@@ -24,14 +22,11 @@ export function HomeRoute() {
   if (questionQuery.isError) {
     return (
       <ErrorState
-        title="The question deck slipped."
-        message="We couldn’t pull a new question. Try the deck again."
+        title="Today’s question is still under the tape."
+        message="It is being prepared now. Check again in a moment."
         onRetry={() => void questionQuery.refetch()}
       />
     )
   }
-  if (!questionQuery.isPending && questionQuery.data === null) {
-    return <EmptyState />
-  }
-  return <LoadingState label="Shuffling the question deck" />
+  return <LoadingState label="Preparing today’s question" />
 }

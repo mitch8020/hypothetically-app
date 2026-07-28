@@ -1,8 +1,15 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { useLocation, useNavigate, useParams } from 'react-router'
-import { ApiError, getResult } from '../api'
+import { useState } from 'react'
+import {
+  ApiError,
+  getPreviousUnansweredQuestion,
+  getResult,
+} from '../api'
 import { AnswerLine } from '../components/AnswerLine'
+import { BacklogCta } from '../components/BacklogCta'
 import { Leaderboard } from '../components/Leaderboard'
+import { LockedResult } from '../components/LockedResult'
 import { QuestionCard } from '../components/QuestionCard'
 import type { QuestionResult } from '../types'
 import { ErrorState, LoadingState } from './StateRoutes'
@@ -12,7 +19,7 @@ interface ResultLocationState {
   fromSubmission?: boolean
 }
 
-function formatAverage(result: QuestionResult): string {
+function formatAverage(result: Extract<QuestionResult, { status: 'unlocked' }>) {
   return new Intl.NumberFormat('en-US', {
     minimumFractionDigits: result.question.precision === 0 ? 1 : 0,
     maximumFractionDigits:
@@ -33,17 +40,34 @@ export function ResultsRoute() {
   const navigate = useNavigate()
   const location = useLocation()
   const locationState = location.state as ResultLocationState | null
-  const submittedResult = locationState?.fromSubmission
+  const initialResult = locationState?.fromSubmission
     ? locationState.result
     : undefined
+  const [submittedResult, setSubmittedResult] = useState(initialResult)
   const resultQuery = useQuery({
-    queryKey: ['result-snapshot', key, location.key],
+    queryKey: ['question-result', key],
     queryFn: () => getResult(key),
     enabled: !submittedResult,
     staleTime: Number.POSITIVE_INFINITY,
     retry: false,
   })
+  const refresh = useMutation({
+    mutationFn: () => getResult(key),
+    onSuccess: (result) => setSubmittedResult(result),
+  })
   const result = submittedResult ?? resultQuery.data
+  const backlogQuery = useQuery({
+    queryKey: [
+      'previous-unanswered',
+      result?.question.dayKey ?? 'before-today',
+      key,
+    ],
+    queryFn: () =>
+      getPreviousUnansweredQuestion(result?.question.dayKey),
+    enabled: Boolean(result),
+    staleTime: 30_000,
+    retry: false,
+  })
 
   if (!result && resultQuery.isPending) {
     return <LoadingState label="Finding your place in the crowd" />
@@ -66,6 +90,20 @@ export function ResultsRoute() {
             ? () => navigate(`/q/${key}`)
             : () => void resultQuery.refetch()
         }
+      />
+    )
+  }
+
+  if (result.status === 'locked') {
+    return (
+      <LockedResult
+        result={result}
+        checking={refresh.isPending}
+        checkError={
+          refresh.error instanceof Error ? refresh.error.message : undefined
+        }
+        onCheck={() => refresh.mutate()}
+        backlogQuery={backlogQuery}
       />
     )
   }
@@ -129,16 +167,7 @@ export function ResultsRoute() {
         question={result.question}
       />
 
-      <div className="results-cta">
-        <p>Don’t overthink the next one.</p>
-        <button
-          className="primary-button"
-          type="button"
-          onClick={() => navigate(`/?exclude=${result.question.key}`)}
-        >
-          Answer Another Question
-        </button>
-      </div>
+      <BacklogCta query={backlogQuery} />
     </section>
   )
 }

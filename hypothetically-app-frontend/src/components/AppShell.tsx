@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, Outlet, useNavigate } from 'react-router'
-import { getCurrentUser, signOut } from '../api'
+import { getCurrentUser, recordVisit, signOut } from '../api'
 import { Avatar } from './Avatar'
 
 export function AppShell() {
@@ -12,11 +12,20 @@ export function AppShell() {
     staleTime: 60_000,
     retry: 1,
   })
+  useQuery({
+    queryKey: ['daily-visit'],
+    queryFn: async () => {
+      await recordVisit()
+      return true
+    },
+    staleTime: Number.POSITIVE_INFINITY,
+    retry: 1,
+  })
   const logout = useMutation({
     mutationFn: signOut,
     onSuccess: async () => {
       queryClient.setQueryData(['current-user'], null)
-      await queryClient.invalidateQueries({ queryKey: ['random-question'] })
+      await queryClient.invalidateQueries({ queryKey: ['today-question'] })
       navigate('/')
     },
   })
@@ -31,8 +40,8 @@ export function AppShell() {
           <strong>though?</strong>
         </Link>
         <div className="header-note" aria-hidden="true">
-          <span>24 odd questions</span>
-          <span>1 crowd answer</span>
+          <span>1 new question</span>
+          <span>Every day</span>
         </div>
         {userQuery.data ? (
           <div className="account">
