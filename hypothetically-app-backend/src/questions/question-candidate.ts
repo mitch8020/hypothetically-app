@@ -5,7 +5,7 @@ export const MAXIMUM_GENERATED_ANSWER = 1_000_000_000;
 export const GeneratedQuestionSchema = z.object({
   prompt: z.string().min(20).max(280),
   unit: z.string().min(1).max(40),
-  answerStyle: z.enum(['whole', 'tenths']),
+  answerStyle: z.literal('whole'),
   maximum: z.number().int().min(10).max(MAXIMUM_GENERATED_ANSWER),
 });
 

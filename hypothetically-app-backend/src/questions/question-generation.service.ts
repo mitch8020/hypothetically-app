@@ -34,7 +34,7 @@ const GOOD_QUESTION_EXAMPLES = [
 
 function examplesForPrompt(): string {
   return GOOD_QUESTION_EXAMPLES.map(({ question, maximum }) => {
-    const answerStyle = question.precision === 0 ? 'whole' : 'tenths';
+    const answerStyle = 'whole';
     return `- ${question.prompt} | unit=${question.unit} | answerStyle=${answerStyle} | maximum=${maximum}`;
   }).join('\n');
 }
@@ -77,7 +77,7 @@ export class QuestionGenerationService {
             'The question must begin with "How many", end with a question mark, and invite an ambiguous estimate rather than have one factual correct answer.',
             'Make it understandable without specialist knowledge and suitable for a broad, general audience.',
             'Avoid politics, religion, sex, violence, illegal activity, health diagnoses, protected traits, personal finances, grief, shame, and requests for sensitive personal information.',
-            'Use a short lowercase unit. Choose "whole" unless one decimal place materially improves the answer.',
+            'Use a short lowercase unit. Choose "whole" always.',
             'Choose the smallest round maximum that comfortably covers playful answers. Prefer 1,000, 10,000, 100,000, or 1,000,000; go higher only when the subject realistically needs it.',
             'Do not copy or closely paraphrase an example or recent question.',
             '',

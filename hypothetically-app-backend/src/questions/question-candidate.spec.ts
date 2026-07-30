@@ -25,6 +25,12 @@ describe('generated question validation', () => {
     expect(
       GeneratedQuestionSchema.safeParse({
         ...VALID_CANDIDATE,
+        answerStyle: 'tenths',
+      }).success,
+    ).toBe(false);
+    expect(
+      GeneratedQuestionSchema.safeParse({
+        ...VALID_CANDIDATE,
         answerStyle: 'currency',
       }).success,
     ).toBe(false);
