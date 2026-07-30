@@ -15,6 +15,7 @@ import { UsersService } from '../users/users.service';
 import { AuthSessionService } from './auth-session.service';
 import { GoogleCallbackExceptionFilter } from './google-callback-exception.filter';
 import { GoogleAuthGuard } from './google-auth.guard';
+import { SESSION_COOKIE_NAME } from './session.constants';
 
 @Controller('auth')
 export class AuthController {
@@ -70,7 +71,7 @@ export class AuthController {
     @Res() response: Response,
   ): Promise<void> {
     await this.authSession.signOut(request);
-    response.clearCookie('hmt.sid');
+    response.clearCookie(SESSION_COOKIE_NAME);
     response.status(204).send();
   }
 }
