@@ -1,5 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -156,6 +162,22 @@ describe('How Many, Though? experience', () => {
       'href',
       `/api/auth/google?returnTo=%2Fq%2F${question.key}`,
     )
+    expect(
+      screen.getByRole('link', { name: 'How Many? home' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: 'Hypothetically' }),
+    ).toHaveAttribute(
+      'href',
+      'https://shop.iv.studio/products/hypothetically-board-game-limited-edition?srsltid=AfmBOoqJSC-djTIg78pY0-pgCw73XHQw-7qxdgtuv7bl06RXhEjYZAdC',
+    )
+    expect(
+      screen.getByRole('navigation', { name: 'Creator links' }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'GitHub' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Instagram' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'LinkedIn' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Discord' })).toBeInTheDocument()
   })
 
   it('keeps the question visible after a failed Google callback', async () => {
@@ -293,8 +315,11 @@ describe('How Many, Though? experience', () => {
       'href',
       expect.stringContaining('twitter.com/intent/tweet'),
     )
-    expect(screen.getByRole('link', { name: 'Facebook' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'LinkedIn' })).toBeInTheDocument()
+    const shareLinks = within(
+      screen.getByLabelText('Share to a social feed'),
+    )
+    expect(shareLinks.getByRole('link', { name: 'Facebook' })).toBeInTheDocument()
+    expect(shareLinks.getByRole('link', { name: 'LinkedIn' })).toBeInTheDocument()
 
     await user.click(
       screen.getByRole('button', { name: 'Share from this device' }),
@@ -400,6 +425,44 @@ describe('How Many, Though? experience', () => {
     expect(
       screen.getByRole('button', { name: 'Try again' }),
     ).toBeInTheDocument()
+  })
+
+  it('loads today by its dated key when a legacy backend treats today as a question key', async () => {
+    let datedQuestionUrl = ''
+    installFetch((url) => {
+      if (url === '/api/auth/me') return json({ user: null })
+      if (url === '/api/questions/today') {
+        return json(
+          {
+            code: 'QUESTION_NOT_FOUND',
+            message: 'That question is no longer available.',
+          },
+          404,
+        )
+      }
+      if (url.startsWith('/api/questions/daily-')) {
+        datedQuestionUrl = url
+        return json({
+          ...question,
+          key: url.slice('/api/questions/'.length),
+          dayKey: undefined,
+        })
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    renderApp('/q/today')
+
+    expect(
+      await screen.findByRole('heading', { name: question.prompt }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Question of the day')).toBeInTheDocument()
+    expect(datedQuestionUrl).toMatch(
+      /^\/api\/questions\/daily-\d{4}-\d{2}-\d{2}$/,
+    )
+    expect(
+      screen.getByRole('link', { name: 'Sign in with Google' }),
+    ).toHaveAttribute('href', '/api/auth/google?returnTo=%2Fq%2Ftoday')
   })
 
   it('navigates to the nearest older unanswered question', async () => {

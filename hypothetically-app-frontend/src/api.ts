@@ -5,6 +5,8 @@ interface ErrorBody {
   message?: string | string[]
 }
 
+const QUESTION_TIME_ZONE = 'America/Chicago'
+
 export class ApiError extends Error {
   readonly status: number
   readonly code?: string
@@ -67,8 +69,38 @@ export async function recordVisit(): Promise<void> {
   await request('/api/traffic/visit', { method: 'POST' })
 }
 
+function todayDayKey(now = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: QUESTION_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(now)
+  const values = Object.fromEntries(
+    parts.map(({ type, value }) => [type, value]),
+  )
+  return `${values.year}-${values.month}-${values.day}`
+}
+
 export async function getTodayQuestion(): Promise<PublicQuestion> {
-  const question = await request<PublicQuestion>('/api/questions/today')
+  let question: PublicQuestion | null
+  try {
+    question = await request<PublicQuestion>('/api/questions/today')
+  } catch (error) {
+    const isLegacyTodayRoute =
+      error instanceof ApiError &&
+      error.status === 404 &&
+      error.code === 'QUESTION_NOT_FOUND'
+    if (!isLegacyTodayRoute) {
+      throw error
+    }
+
+    const dayKey = todayDayKey()
+    const datedQuestion = await getQuestion(`daily-${dayKey}`)
+    return datedQuestion.dayKey
+      ? datedQuestion
+      : { ...datedQuestion, dayKey }
+  }
   if (!question) {
     throw new ApiError('Today’s question is still being prepared.', 503)
   }

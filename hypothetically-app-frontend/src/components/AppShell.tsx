@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, Outlet, useNavigate } from 'react-router'
 import { getCurrentUser, recordVisit, signOut } from '../api'
 import { Avatar } from './Avatar'
+import { SocialFooter } from './SocialFooter'
 
 export function AppShell() {
   const queryClient = useQueryClient()
@@ -35,9 +36,9 @@ export function AppShell() {
       <div className="paper-shape paper-shape--one" aria-hidden="true" />
       <div className="paper-shape paper-shape--two" aria-hidden="true" />
       <header className="site-header">
-        <Link className="wordmark" to="/" aria-label="How Many, Though? home">
-          <span>How many,</span>
-          <strong>though?</strong>
+        <Link className="wordmark" to="/" aria-label="How Many? home">
+          <span>How</span>
+          <strong>many?</strong>
         </Link>
         <div className="header-note" aria-hidden="true">
           <span>1 new question</span>
@@ -66,10 +67,7 @@ export function AppShell() {
       <main>
         <Outlet context={{ userQuery }} />
       </main>
-      <footer>
-        <span>Go with your gut.</span>
-        <span>Then see where it lands.</span>
-      </footer>
+      <SocialFooter />
     </div>
   )
 }

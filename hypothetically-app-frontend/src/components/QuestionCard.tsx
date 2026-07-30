@@ -3,11 +3,19 @@ import type { PublicQuestion } from '../types'
 interface QuestionCardProps {
   question: PublicQuestion
   compact?: boolean
+  accented?: boolean
 }
 
-export function QuestionCard({ question, compact = false }: QuestionCardProps) {
+export function QuestionCard({
+  question,
+  compact = false,
+  accented = false,
+}: QuestionCardProps) {
   return (
     <article className={`question-card${compact ? ' question-card--compact' : ''}`}>
+      {accented && (
+        <span className="question-card__accent" aria-hidden="true" />
+      )}
       <span className="question-card__eyebrow">
         {question.dayKey ? 'Question of the day' : 'Just between us'}
       </span>

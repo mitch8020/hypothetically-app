@@ -2,7 +2,13 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router'
-import { ApiError, getCurrentUser, getQuestion, submitAnswer } from '../api'
+import {
+  ApiError,
+  getCurrentUser,
+  getQuestion,
+  getTodayQuestion,
+  submitAnswer,
+} from '../api'
 import { GoogleMark } from '../components/GoogleMark'
 import { QuestionCard } from '../components/QuestionCard'
 import type { PublicQuestion } from '../types'
@@ -48,8 +54,8 @@ export function QuestionRoute() {
   const [clientError, setClientError] = useState<string | null>(null)
   const questionQuery = useQuery({
     queryKey: ['question', key],
-    queryFn: () => getQuestion(key),
-    retry: 1,
+    queryFn: () => (key === 'today' ? getTodayQuestion() : getQuestion(key)),
+    retry: key === 'today' ? false : 1,
   })
   const userQuery = useQuery({
     queryKey: ['current-user'],
@@ -58,9 +64,14 @@ export function QuestionRoute() {
     retry: 1,
   })
   const answerMutation = useMutation({
-    mutationFn: (answer: number) => submitAnswer(key, answer),
+    mutationFn: (answer: number) => {
+      if (!questionQuery.data) {
+        throw new Error('The question is not ready yet.')
+      }
+      return submitAnswer(questionQuery.data.key, answer)
+    },
     onSuccess: (result) => {
-      navigate(`/q/${key}/results`, {
+      navigate(`/q/${result.question.key}/results`, {
         state: { result, fromSubmission: true },
       })
     },
@@ -87,6 +98,15 @@ export function QuestionRoute() {
     return <LoadingState />
   }
   if (questionQuery.isError || !question) {
+    if (key === 'today') {
+      return (
+        <ErrorState
+          title="Today’s question is still under the tape."
+          message="It is being prepared now. Check again in a moment."
+          onRetry={() => void questionQuery.refetch()}
+        />
+      )
+    }
     return (
       <ErrorState
         title="That question wandered off."
@@ -104,7 +124,7 @@ export function QuestionRoute() {
     )
   }
 
-  const returnTo = `/q/${question.key}`
+  const questionPath = key === 'today' ? '/q/today' : `/q/${question.key}`
   const conflict =
     answerMutation.error instanceof ApiError &&
     answerMutation.error.code === 'ANSWER_ALREADY_SUBMITTED'
@@ -116,7 +136,7 @@ export function QuestionRoute() {
           <span>There is no right answer.</span>
           <span>Only the crowd.</span>
         </div>
-        <QuestionCard question={question} />
+        <QuestionCard question={question} accented />
       </div>
 
       <div className="answer-panel">
@@ -132,7 +152,7 @@ export function QuestionRoute() {
             <p>Keep it in your head. Sign in, lock it down, then meet the crowd.</p>
             <a
               className="google-button"
-              href={`/api/auth/google?returnTo=${encodeURIComponent(returnTo)}`}
+              href={`/api/auth/google?returnTo=${encodeURIComponent(questionPath)}`}
             >
               <GoogleMark />
               <span>Sign in with Google</span>
@@ -179,7 +199,7 @@ export function QuestionRoute() {
                 <button
                   className="secondary-button"
                   type="button"
-                  onClick={() => navigate(`/q/${key}/results`)}
+                  onClick={() => navigate(`/q/${question.key}/results`)}
                 >
                   See your locked answer
                 </button>

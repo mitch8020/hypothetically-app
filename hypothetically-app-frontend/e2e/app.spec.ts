@@ -23,6 +23,14 @@ const previousQuestion = {
   dayKey: '2026-07-27',
 }
 
+const nextDayQuestion = {
+  ...todayQuestion,
+  key: 'daily-2026-07-29',
+  prompt: 'How many pebbles could fit in your favorite coffee mug?',
+  unit: 'pebbles',
+  dayKey: '2026-07-29',
+}
+
 const lockedResult = {
   status: 'locked',
   question: todayQuestion,
@@ -78,6 +86,7 @@ async function mockApi(
   options: {
     signedIn: boolean
     onResultsRead?: () => void
+    getTodayQuestion?: () => typeof todayQuestion
   },
 ) {
   await page.route('**/api/**', async (route) => {
@@ -104,7 +113,9 @@ async function mockApi(
       return
     }
     if (path === '/api/questions/today') {
-      await route.fulfill({ json: todayQuestion })
+      await route.fulfill({
+        json: options.getTodayQuestion?.() ?? todayQuestion,
+      })
       return
     }
     if (path === `/api/questions/${todayQuestion.key}` && method === 'GET') {
@@ -157,13 +168,30 @@ function seriousA11yViolations(page: Page) {
     )
 }
 
+async function expectAnswerLineLabelsToBeSeparated(page: Page) {
+  const [headingBox, markerBox] = await Promise.all([
+    page.locator('.answer-line figcaption strong').boundingBox(),
+    page.locator('.average-marker b').boundingBox(),
+  ])
+
+  expect(headingBox).not.toBeNull()
+  expect(markerBox).not.toBeNull()
+  expect(headingBox!.y + headingBox!.height + 4).toBeLessThanOrEqual(
+    markerBox!.y,
+  )
+}
+
 test('guest lands on the one shared daily question with an accessible Google entry point', async ({
   page,
 }) => {
-  await mockApi(page, { signedIn: false })
+  let currentTodayQuestion = todayQuestion
+  await mockApi(page, {
+    signedIn: false,
+    getTodayQuestion: () => currentTodayQuestion,
+  })
   await page.goto('/')
 
-  await expect(page).toHaveURL(`/q/${todayQuestion.key}`)
+  await expect(page).toHaveURL('/q/today')
   await expect(
     page.getByRole('heading', { name: todayQuestion.prompt }),
   ).toBeVisible()
@@ -173,14 +201,31 @@ test('guest lands on the one shared daily question with an accessible Google ent
   const googleLink = page.getByRole('link', { name: 'Sign in with Google' })
   await expect(googleLink).toHaveAttribute(
     'href',
-    `/api/auth/google?returnTo=%2Fq%2F${todayQuestion.key}`,
+    '/api/auth/google?returnTo=%2Fq%2Ftoday',
   )
+  await expect(
+    page.getByRole('link', { name: 'Hypothetically' }),
+  ).toHaveAttribute(
+    'href',
+    'https://shop.iv.studio/products/hypothetically-board-game-limited-edition?srsltid=AfmBOoqJSC-djTIg78pY0-pgCw73XHQw-7qxdgtuv7bl06RXhEjYZAdC',
+  )
+  await expect(
+    page.getByRole('navigation', { name: 'Creator links' }),
+  ).toBeVisible()
 
   await page.keyboard.press('Tab')
   await expect(
-    page.getByRole('link', { name: 'How Many, Though? home' }),
+    page.getByRole('link', { name: 'How Many? home' }),
   ).toBeFocused()
   expect(await seriousA11yViolations(page)).toEqual([])
+
+  currentTodayQuestion = nextDayQuestion
+  await page.reload()
+
+  await expect(page).toHaveURL('/q/today')
+  await expect(
+    page.getByRole('heading', { name: nextDayQuestion.prompt }),
+  ).toBeVisible()
 })
 
 test('signed-in user moves from sealed answer to manual crowd unlock and backlog', async ({
@@ -217,7 +262,11 @@ test('signed-in user moves from sealed answer to manual crowd unlock and backlog
     /twitter\.com\/intent\/tweet/,
   )
   await expect(page.getByRole('link', { name: 'Facebook' })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'LinkedIn' })).toBeVisible()
+  await expect(
+    page
+      .getByLabel('Share to a social feed')
+      .getByRole('link', { name: 'LinkedIn' }),
+  ).toBeVisible()
 
   await page.getByRole('button', { name: 'Copy question link' }).click()
   await expect(page.getByText('Question link copied.')).toBeVisible()
@@ -241,6 +290,7 @@ test('signed-in user moves from sealed answer to manual crowd unlock and backlog
     page.getByRole('region', { name: 'The leaderboard' }),
   ).toBeVisible()
   await expect(page.getByText('Your place')).toBeVisible()
+  await expectAnswerLineLabelsToBeSeparated(page)
   expect(resultsReads).toBe(1)
   expect(await seriousA11yViolations(page)).toEqual([])
 

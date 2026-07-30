@@ -73,8 +73,8 @@ export class QuestionGenerationService {
         {
           role: 'developer',
           content: [
-            'Create one playful numeric estimation question for the public game "How Many, Though?".',
-            'The question must begin with "How many", end with a question mark, and invite a gut estimate rather than have one factual correct answer.',
+            'Create one playful numeric estimation question for the public game "How Many?".',
+            'The question must begin with "How many", end with a question mark, and invite an ambiguous estimate rather than have one factual correct answer.',
             'Make it understandable without specialist knowledge and suitable for a broad, general audience.',
             'Avoid politics, religion, sex, violence, illegal activity, health diagnoses, protected traits, personal finances, grief, shame, and requests for sensitive personal information.',
             'Use a short lowercase unit. Choose "whole" unless one decimal place materially improves the answer.',

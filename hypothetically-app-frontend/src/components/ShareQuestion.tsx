@@ -45,7 +45,7 @@ export function ShareQuestion({ question }: ShareQuestionProps) {
   async function shareFromDevice() {
     try {
       await navigator.share({
-        title: 'How Many, Though?',
+        title: 'How Many?',
         text: shareText,
         url: shareUrl,
       })
