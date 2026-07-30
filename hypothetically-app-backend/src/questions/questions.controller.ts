@@ -71,7 +71,12 @@ export class QuestionsController {
     @Req() request: Request,
     @Body() body: SubmitAnswerDto,
   ): Promise<QuestionResult> {
-    return this.questionsService.submitAnswer(key, request.user!, body.value);
+    return this.questionsService.submitAnswer(
+      key,
+      request.user!,
+      body.value,
+      body.timeZone,
+    );
   }
 
   @Get(':key/results')
@@ -79,7 +84,8 @@ export class QuestionsController {
   async results(
     @Param('key') key: string,
     @Req() request: Request,
+    @Query('timeZone') timeZone?: string,
   ): Promise<QuestionResult> {
-    return this.questionsService.getResult(key, request.user!);
+    return this.questionsService.getResult(key, request.user!, timeZone);
   }
 }

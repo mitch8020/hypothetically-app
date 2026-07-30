@@ -22,9 +22,8 @@ export interface LockedQuestionResult {
   status: 'locked';
   question: PublicQuestion;
   userAnswer: number;
-  answerCount: number;
-  requiredAnswerCount: number;
-  remainingAnswerCount: number;
+  unlocksAt: string;
+  timeZone: string;
 }
 
 export interface UnlockedQuestionResult {
@@ -32,8 +31,6 @@ export interface UnlockedQuestionResult {
   question: PublicQuestion;
   average: number;
   answerCount: number;
-  requiredAnswerCount: number;
-  remainingAnswerCount: 0;
   leaders: LeaderboardEntry[];
   userEntry: LeaderboardEntry & { distanceToWinner: number };
   winningEntry: LeaderboardEntry;

@@ -26,6 +26,9 @@ export class Answer {
   @Prop({ required: true })
   value!: number;
 
+  @Prop({ trim: true })
+  timeZone?: string;
+
   createdAt!: Date;
   updatedAt!: Date;
 }

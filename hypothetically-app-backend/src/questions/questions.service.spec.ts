@@ -13,7 +13,6 @@ import { QuestionResult, UnlockedQuestionResult } from './question.types';
 import { QuestionsModule } from './questions.module';
 import { QuestionsService } from './questions.service';
 import { Answer } from './schemas/answer.schema';
-import { DailyVisit } from './schemas/daily-visit.schema';
 import { Question } from './schemas/question.schema';
 import { QuestionGeneration } from './schemas/question-generation.schema';
 
@@ -33,7 +32,6 @@ describe('QuestionsService integration', () => {
   let usersService: UsersService;
   let answerModel: Model<Answer>;
   let questionModel: Model<Question>;
-  let visitModel: Model<DailyVisit>;
   let generationModel: Model<QuestionGeneration>;
   let userModel: Model<User>;
   const generate = jest.fn();
@@ -73,13 +71,11 @@ describe('QuestionsService integration', () => {
     usersService = module.get(UsersService);
     answerModel = module.get(getModelToken(Answer.name));
     questionModel = module.get(getModelToken(Question.name));
-    visitModel = module.get(getModelToken(DailyVisit.name));
     generationModel = module.get(getModelToken(QuestionGeneration.name));
     userModel = module.get(getModelToken(User.name));
     await Promise.all([
       answerModel.syncIndexes(),
       questionModel.syncIndexes(),
-      visitModel.syncIndexes(),
       generationModel.syncIndexes(),
       userModel.syncIndexes(),
     ]);
@@ -106,7 +102,6 @@ describe('QuestionsService integration', () => {
     await Promise.all([
       answerModel.deleteMany({}),
       questionModel.deleteMany({}),
-      visitModel.deleteMany({}),
       generationModel.deleteMany({}),
       userModel.deleteMany({}),
     ]);
@@ -114,7 +109,6 @@ describe('QuestionsService integration', () => {
       QUESTION_CATALOG.map((question) => ({
         ...question,
         source: 'catalog',
-        requiredAnswerCount: 1,
       })),
     );
   });
@@ -149,15 +143,7 @@ describe('QuestionsService integration', () => {
     expect(result.average).toBe(10);
   });
 
-  it('generates one Central-time question and snapshots one-fifth of prior traffic', async () => {
-    await visitModel.insertMany(
-      Array.from({ length: 11 }, (_, index) => ({
-        dayKey: '2026-07-27',
-        visitorHash: `visitor-${index}`,
-        expiresAt: new Date('2026-09-01T00:00:00.000Z'),
-      })),
-    );
-
+  it('generates one Central-time question without a crowd-size threshold', async () => {
     const now = new Date('2026-07-28T12:00:00.000Z');
     const first = await service.findTodayQuestion(now);
     const second = await service.findTodayQuestion(now);
@@ -170,25 +156,15 @@ describe('QuestionsService integration', () => {
       step: 1,
     });
     expect(generate).toHaveBeenCalledTimes(1);
-    await expect(
-      questionModel.findOne({ dayKey: '2026-07-28' }).lean().exec(),
-    ).resolves.toMatchObject({
-      requiredAnswerCount: 3,
+    const stored = await questionModel
+      .findOne({ dayKey: '2026-07-28' })
+      .lean()
+      .exec();
+    expect(stored).toMatchObject({
       generationModel: 'gpt-5.6-luna',
       promptVersion: 'daily-question-v1',
     });
-
-    await visitModel.insertMany(
-      Array.from({ length: 20 }, (_, index) => ({
-        dayKey: '2026-07-27',
-        visitorHash: `late-visitor-${index}`,
-        expiresAt: new Date('2026-09-01T00:00:00.000Z'),
-      })),
-    );
-    await service.findTodayQuestion(now);
-    await expect(
-      questionModel.findOne({ dayKey: '2026-07-28' }).lean().exec(),
-    ).resolves.toMatchObject({ requiredAnswerCount: 3 });
+    expect(stored).not.toHaveProperty('requiredAnswerCount');
   });
 
   it('runs only the Heroku Scheduler invocation in the Central midnight hour', async () => {
@@ -325,49 +301,84 @@ describe('QuestionsService integration', () => {
     ).resolves.toMatchObject({ key: 'daily-2026-07-28' });
   });
 
-  it('hides aggregates until the immutable answer target is reached', async () => {
-    await visitModel.insertMany(
-      Array.from({ length: 11 }, (_, index) => ({
-        dayKey: '2026-07-27',
-        visitorHash: `threshold-${index}`,
-        expiresAt: new Date('2026-09-01T00:00:00.000Z'),
-      })),
-    );
+  it('reveals by each immutable answer timezone at its exact midnight', async () => {
     await service.findTodayQuestion(new Date('2026-07-28T12:00:00.000Z'));
     const alex = await makeUser('alex', 'Alex', 'A');
     const blair = await makeUser('blair', 'Blair', 'B');
     const casey = await makeUser('casey', 'Casey', 'C');
-
-    const first = await service.submitAnswer('daily-2026-07-28', alex, 10);
-    expect(first).toEqual(
-      expect.objectContaining({
-        status: 'locked',
-        userAnswer: 10,
-        answerCount: 1,
-        requiredAnswerCount: 3,
-        remainingAnswerCount: 2,
-      }),
+    const instantBeforeLosAngelesMidnight = new Date(
+      '2026-07-29T06:59:59.999Z',
     );
+
+    const first = await service.submitAnswer(
+      'daily-2026-07-28',
+      alex,
+      10,
+      'America/Los_Angeles',
+      instantBeforeLosAngelesMidnight,
+    );
+    expect(first).toEqual({
+      status: 'locked',
+      question: expect.objectContaining({ key: 'daily-2026-07-28' }),
+      userAnswer: 10,
+      unlocksAt: '2026-07-29T07:00:00.000Z',
+      timeZone: 'America/Los_Angeles',
+    });
     expect(first).not.toHaveProperty('average');
     expect(first).not.toHaveProperty('leaders');
+    expect(first).not.toHaveProperty('answerCount');
 
-    await service.submitAnswer('daily-2026-07-28', blair, 20);
-    const unlocked = await service.submitAnswer('daily-2026-07-28', casey, 100);
-    assertUnlocked(unlocked);
-    expect(unlocked.average).toBeCloseTo(43.333333, 5);
-    expect(unlocked.answerCount).toBe(3);
-    expect(unlocked.winningEntry).toMatchObject({
+    await expect(
+      service.submitAnswer(
+        'daily-2026-07-28',
+        blair,
+        20,
+        'America/Los_Angeles',
+        instantBeforeLosAngelesMidnight,
+      ),
+    ).resolves.toMatchObject({ status: 'locked' });
+    const tokyoResult = await service.submitAnswer(
+      'daily-2026-07-28',
+      casey,
+      100,
+      'Asia/Tokyo',
+      instantBeforeLosAngelesMidnight,
+    );
+    assertUnlocked(tokyoResult);
+    expect(tokyoResult.average).toBeCloseTo(43.333333, 5);
+    expect(tokyoResult.answerCount).toBe(3);
+    expect(tokyoResult.winningEntry).toMatchObject({
       rank: 1,
       displayName: 'Blair B.',
       value: 20,
     });
-    expect(unlocked.userEntry).toMatchObject({
+    expect(tokyoResult.userEntry).toMatchObject({
       rank: 3,
       displayName: 'Casey C.',
       value: 100,
       isCurrentUser: true,
       distanceToWinner: 80,
     });
+
+    await expect(
+      service.getResult(
+        'daily-2026-07-28',
+        alex,
+        'Asia/Tokyo',
+        instantBeforeLosAngelesMidnight,
+      ),
+    ).resolves.toMatchObject({
+      status: 'locked',
+      timeZone: 'America/Los_Angeles',
+    });
+    const exactMidnight = await service.getResult(
+      'daily-2026-07-28',
+      alex,
+      'Asia/Tokyo',
+      new Date('2026-07-29T07:00:00.000Z'),
+    );
+    assertUnlocked(exactMidnight);
+    expect(exactMidnight.average).toBeCloseTo(43.333333, 5);
   });
 
   it('locks the first answer and validates numeric precision', async () => {
@@ -380,17 +391,60 @@ describe('QuestionsService integration', () => {
     await expect(
       service.submitAnswer('one-foot-balance', user, 3600.1),
     ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'INVALID_PRECISION' }),
+    });
+    await expect(
+      service.submitAnswer('one-foot-balance', user, 1_000_000_001),
+    ).rejects.toMatchObject({
       response: expect.objectContaining({ code: 'ANSWER_OUT_OF_RANGE' }),
     });
 
-    const result = await service.submitAnswer('one-foot-balance', user, 12.3);
+    const result = await service.submitAnswer('one-foot-balance', user, 12);
     assertUnlocked(result);
-    expect(result.userEntry.value).toBe(12.3);
+    expect(result.userEntry.value).toBe(12);
     await expect(
-      service.submitAnswer('one-foot-balance', user, 12.4),
+      service.submitAnswer('one-foot-balance', user, 13),
     ).rejects.toMatchObject({
       response: expect.objectContaining({ code: 'ANSWER_ALREADY_SUBMITTED' }),
     });
+  });
+
+  it('rejects invalid timezones and atomically adopts one for legacy answers', async () => {
+    await service.findTodayQuestion(new Date('2026-07-28T12:00:00.000Z'));
+    const user = await makeUser('legacy-zone', 'Legacy', 'Z');
+    await expect(
+      service.submitAnswer('daily-2026-07-28', user, 12, 'Not/A_Real_Zone'),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'INVALID_TIME_ZONE' }),
+    });
+
+    const question = await questionModel
+      .findOne({ key: 'daily-2026-07-28' })
+      .exec();
+    expect(question).toBeTruthy();
+    await answerModel.create({
+      user: user._id,
+      question: question!._id,
+      value: 12,
+    });
+
+    await expect(
+      service.getResult(
+        'daily-2026-07-28',
+        user,
+        'Asia/Tokyo',
+        new Date('2026-07-28T14:59:59.999Z'),
+      ),
+    ).resolves.toMatchObject({
+      status: 'locked',
+      timeZone: 'Asia/Tokyo',
+    });
+    await expect(
+      answerModel
+        .findOne({ user: user._id, question: question!._id })
+        .lean()
+        .exec(),
+    ).resolves.toMatchObject({ timeZone: 'Asia/Tokyo' });
   });
 
   it('gives equal distances the same rank and pins users outside the top five', async () => {
@@ -438,7 +492,14 @@ describe('QuestionsService integration', () => {
         requiredAnswerCount: 1,
       },
     ]);
-    await service.submitAnswer('daily-2026-07-27', user, 5);
+    const historical = await service.submitAnswer(
+      'daily-2026-07-27',
+      user,
+      5,
+      'America/Los_Angeles',
+      new Date('2026-07-29T12:00:00.000Z'),
+    );
+    assertUnlocked(historical);
 
     await expect(
       service.findPreviousUnansweredQuestion(user, '2026-07-28'),

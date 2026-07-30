@@ -15,11 +15,12 @@ import { User } from '../users/schemas/user.schema';
 import { QUESTION_CATALOG } from './question.catalog';
 import { validateGeneratedQuestion } from './question-candidate';
 import {
+  canonicalTimeZone,
+  dailyQuestionUnlockAt,
   DEFAULT_QUESTION_TIME_ZONE,
   isQuestionGenerationHour,
   previousQuestionDay,
   questionDayKey,
-  requiredAnswerCount,
 } from './question-day';
 import {
   GeneratedQuestion,
@@ -33,7 +34,6 @@ import {
   UnlockedQuestionResult,
 } from './question.types';
 import { Answer } from './schemas/answer.schema';
-import { DailyVisit } from './schemas/daily-visit.schema';
 import { Question, QuestionDocument } from './schemas/question.schema';
 import { QuestionGeneration } from './schemas/question-generation.schema';
 
@@ -62,8 +62,6 @@ export class QuestionsService implements OnApplicationBootstrap {
     private readonly questionModel: Model<Question>,
     @InjectModel(Answer.name)
     private readonly answerModel: Model<Answer>,
-    @InjectModel(DailyVisit.name)
-    private readonly visitModel: Model<DailyVisit>,
     @InjectModel(QuestionGeneration.name)
     private readonly generationModel: Model<QuestionGeneration>,
     private readonly generator: QuestionGenerationService,
@@ -162,15 +160,19 @@ export class QuestionsService implements OnApplicationBootstrap {
     key: string,
     user: Express.User,
     value: number,
+    timeZone?: string,
+    now = new Date(),
   ): Promise<QuestionResult> {
     const question = await this.findQuestion(key);
     const normalizedValue = this.validateValue(question, value);
+    const answerTimeZone = this.requestTimeZone(timeZone);
 
     try {
       await this.answerModel.create({
         user: user._id,
         question: question._id,
         value: normalizedValue,
+        timeZone: answerTimeZone,
       });
     } catch (error) {
       if (!this.isDuplicateKeyError(error)) {
@@ -187,10 +189,15 @@ export class QuestionsService implements OnApplicationBootstrap {
       }
     }
 
-    return this.buildResult(question, user._id);
+    return this.buildResult(question, user._id, answerTimeZone, now);
   }
 
-  async getResult(key: string, user: Express.User): Promise<QuestionResult> {
+  async getResult(
+    key: string,
+    user: Express.User,
+    timeZone?: string,
+    now = new Date(),
+  ): Promise<QuestionResult> {
     const question = await this.findQuestion(key);
     const hasAnswered = await this.answerModel.exists({
       user: user._id,
@@ -202,7 +209,12 @@ export class QuestionsService implements OnApplicationBootstrap {
         message: 'Answer this question before seeing the crowd.',
       });
     }
-    return this.buildResult(question, user._id);
+    return this.buildResult(
+      question,
+      user._id,
+      this.requestTimeZone(timeZone),
+      now,
+    );
   }
 
   private async ensureTodayQuestion(
@@ -224,10 +236,6 @@ export class QuestionsService implements OnApplicationBootstrap {
     }
 
     try {
-      const previousDay = previousQuestionDay(dayKey);
-      const previousDayVisitors = await this.visitModel
-        .countDocuments({ dayKey: previousDay })
-        .exec();
       const recentQuestions = await this.questionModel
         .find({ active: true, source: 'gpt' })
         .sort({ dayKey: -1 })
@@ -273,11 +281,7 @@ export class QuestionsService implements OnApplicationBootstrap {
         );
       }
 
-      const question = await this.createGeneratedQuestion(
-        dayKey,
-        generated,
-        requiredAnswerCount(previousDayVisitors),
-      );
+      const question = await this.createGeneratedQuestion(dayKey, generated);
       await this.generationModel
         .updateOne(
           { dayKey },
@@ -357,7 +361,6 @@ export class QuestionsService implements OnApplicationBootstrap {
   private async createGeneratedQuestion(
     dayKey: string,
     generated: GeneratedQuestion,
-    unlockCount: number,
   ): Promise<QuestionDocument> {
     const answerStyle = generated.candidate.answerStyle;
     try {
@@ -372,7 +375,6 @@ export class QuestionsService implements OnApplicationBootstrap {
         active: true,
         dayKey,
         source: 'gpt',
-        requiredAnswerCount: unlockCount,
         generationModel: generated.model,
         generationResponseId: generated.responseId,
         promptVersion: QUESTION_PROMPT_VERSION,
@@ -437,38 +439,92 @@ export class QuestionsService implements OnApplicationBootstrap {
   private async buildResult(
     question: QuestionDocument,
     currentUserId: Types.ObjectId,
+    requestedTimeZone: string,
+    now: Date,
   ): Promise<QuestionResult> {
-    const [answerCount, currentAnswer] = await Promise.all([
-      this.answerModel.countDocuments({ question: question._id }).exec(),
-      this.answerModel
-        .findOne({ question: question._id, user: currentUserId })
-        .lean()
-        .exec(),
-    ]);
+    const currentAnswer = await this.answerModel
+      .findOne({ question: question._id, user: currentUserId })
+      .lean()
+      .exec();
     if (!currentAnswer) {
       throw new ForbiddenException({
         code: 'ANSWER_REQUIRED',
         message: 'Answer this question before seeing the crowd.',
       });
     }
-    const unlockCount = question.requiredAnswerCount ?? 1;
-    if (answerCount < unlockCount) {
-      return {
-        status: 'locked',
-        question: this.toPublicQuestion(question),
-        userAnswer: currentAnswer.value,
-        answerCount,
-        requiredAnswerCount: unlockCount,
-        remainingAnswerCount: unlockCount - answerCount,
-      };
+    const answerTimeZone = await this.answerTimeZone(
+      currentAnswer._id,
+      currentAnswer.timeZone,
+      requestedTimeZone,
+    );
+    if (question.dayKey) {
+      const unlocksAt = dailyQuestionUnlockAt(question.dayKey, answerTimeZone);
+      if (now.getTime() < unlocksAt.getTime()) {
+        return {
+          status: 'locked',
+          question: this.toPublicQuestion(question),
+          userAnswer: currentAnswer.value,
+          unlocksAt: unlocksAt.toISOString(),
+          timeZone: answerTimeZone,
+        };
+      }
     }
-    return this.buildUnlockedResult(question, currentUserId, unlockCount);
+    return this.buildUnlockedResult(question, currentUserId);
+  }
+
+  private async answerTimeZone(
+    answerId: Types.ObjectId,
+    storedTimeZone: string | undefined,
+    requestedTimeZone: string,
+  ): Promise<string> {
+    if (storedTimeZone) {
+      try {
+        return canonicalTimeZone(storedTimeZone);
+      } catch {
+        return this.timeZone;
+      }
+    }
+
+    await this.answerModel
+      .updateOne(
+        {
+          _id: answerId,
+          $or: [
+            { timeZone: { $exists: false } },
+            { timeZone: null },
+            { timeZone: '' },
+          ],
+        },
+        { $set: { timeZone: requestedTimeZone } },
+      )
+      .exec();
+    const claimed = await this.answerModel
+      .findById(answerId)
+      .select({ timeZone: 1 })
+      .lean()
+      .exec();
+    return claimed?.timeZone
+      ? canonicalTimeZone(claimed.timeZone)
+      : requestedTimeZone;
+  }
+
+  private requestTimeZone(timeZone?: string): string {
+    if (timeZone === undefined) {
+      return this.timeZone;
+    }
+    try {
+      return canonicalTimeZone(timeZone);
+    } catch {
+      throw new BadRequestException({
+        code: 'INVALID_TIME_ZONE',
+        message: 'Use a valid IANA time zone.',
+      });
+    }
   }
 
   private async buildUnlockedResult(
     question: QuestionDocument,
     currentUserId: Types.ObjectId,
-    unlockCount: number,
   ): Promise<UnlockedQuestionResult> {
     const answers = (await this.answerModel
       .find({ question: question._id })
@@ -528,8 +584,6 @@ export class QuestionsService implements OnApplicationBootstrap {
       question: this.toPublicQuestion(question),
       average,
       answerCount: answers.length,
-      requiredAnswerCount: unlockCount,
-      remainingAnswerCount: 0,
       leaders: ranked.slice(0, 5).map((entry) => this.publicEntry(entry)),
       userEntry: {
         ...this.publicEntry(currentUserEntry),

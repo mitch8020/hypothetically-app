@@ -29,24 +29,6 @@ function whole(
   };
 }
 
-function tenths(
-  key: string,
-  prompt: string,
-  unit: string,
-  maximum = DEFAULT_MAXIMUM,
-): CatalogQuestion {
-  return {
-    key,
-    prompt,
-    unit,
-    minimum: 0,
-    maximum,
-    step: 0.1,
-    precision: 1,
-    active: true,
-  };
-}
-
 export const QUESTION_CATALOG: readonly CatalogQuestion[] = [
   whole(
     'doors-opened',
@@ -55,18 +37,22 @@ export const QUESTION_CATALOG: readonly CatalogQuestion[] = [
   ),
   whole(
     'fries-eaten',
-    'How many french fries do you think you’ve eaten?',
+    'How many french fries do you think you’ve eaten last month?',
     'fries',
   ),
-  tenths(
+  whole(
     'hours-in-lines',
-    'How many hours have you spent waiting in lines?',
+    'How many hours have you spent in your life waiting in lines?',
     'hours',
   ),
-  whole('dogs-petted', 'How many different dogs have you petted?', 'dogs'),
+  whole(
+    'dogs-petted',
+    'How many different dogs have you petted this year?',
+    'dogs',
+  ),
   whole(
     'already-in-your-hand',
-    'How many times have you searched for something already in your hand?',
+    'How many times have you searched for something already in your hand in your life?',
     'times',
   ),
   whole(
@@ -76,54 +62,48 @@ export const QUESTION_CATALOG: readonly CatalogQuestion[] = [
   ),
   whole(
     'photos-of-you',
-    'How many photos of you do you think exist?',
+    'How many photos of you do you think exist in your lifetime?',
     'photos',
   ),
   whole(
     'choosing-what-to-watch',
-    'How many total minutes have you spent deciding what to watch?',
+    'How many total minutes have you spent deciding what to watch in your lifetime?',
     'minutes',
   ),
   whole(
     'paper-airplanes',
     'How many paper airplanes could you fold in one hour?',
     'airplanes',
-    10_000,
   ),
   whole(
     'jumping-jacks',
     'How many jumping jacks could you do without stopping?',
     'jumping jacks',
-    100_000,
   ),
   whole(
     'balloons-with-feet',
     'How many balloons could you pop in one minute using only your feet?',
     'balloons',
-    10_000,
   ),
-  tenths(
+  whole(
     'one-foot-balance',
     'How many seconds could you balance on one foot with your eyes closed?',
     'seconds',
-    3_600,
   ),
   whole(
     'names-in-ten-minutes',
-    'How many people could you name from memory in ten minutes?',
+    'How many famous people could you name from memory in ten minutes?',
     'people',
   ),
   whole(
     'cracker-tower',
     'How many crackers could you stack before the tower fell?',
     'crackers',
-    10_000,
   ),
   whole(
     'tennis-ball-bounces',
     'How many times could you bounce a tennis ball in sixty seconds?',
     'bounces',
-    10_000,
   ),
   whole(
     'rubber-ducks-bedroom',
@@ -132,20 +112,18 @@ export const QUESTION_CATALOG: readonly CatalogQuestion[] = [
   ),
   whole(
     'sticky-notes-door',
-    'How many sticky notes would cover one side of your bedroom door?',
+    'How many sticky notes would cover one side of your house?',
     'notes',
   ),
   whole(
     'grapes-one-hand',
     'How many grapes could you hold in one hand?',
     'grapes',
-    10_000,
   ),
   whole(
-    'ping-pong-clothes',
-    'How many ping-pong balls could you hide in the clothes you’re wearing?',
-    'balls',
-    100_000,
+    'marshmallows-in-mouth',
+    'How many marshmallows could you fit in your mouth at once?',
+    'marshmallows',
   ),
   whole(
     'cereal-in-bowl',
@@ -159,12 +137,12 @@ export const QUESTION_CATALOG: readonly CatalogQuestion[] = [
   ),
   whole(
     'pencils-across-home',
-    'How many pencils laid end to end would reach across your home?',
+    'How many pencils laid end to end would it take to visit each room in your home?',
     'pencils',
   ),
   whole(
     'paper-clips-phone',
-    'How many paper clips would weigh the same as your phone?',
+    'How many paper clips would weigh the same as you do?',
     'paper clips',
   ),
   whole(

@@ -246,36 +246,51 @@ describe('How Many, Though? API (e2e)', () => {
     const submitted = await agent
       .post(`/api/questions/${todayKey}/answer`)
       .set('Origin', 'http://localhost:7073')
-      .send({ value: 125 })
+      .send({ value: 125, timeZone: 'America/Chicago' })
       .expect(201);
     expect(submitted.body).toEqual(
       expect.objectContaining({
-        status: 'unlocked',
-        average: 125,
-        answerCount: 1,
-        userEntry: expect.objectContaining({
-          rank: 1,
-          value: 125,
-          distanceToWinner: 0,
-        }),
+        status: 'locked',
+        userAnswer: 125,
+        timeZone: 'America/Chicago',
+        unlocksAt: expect.stringMatching(/T0[56]:00:00\.000Z$/),
       }),
     );
+    expect(submitted.body).not.toHaveProperty('average');
+    expect(submitted.body).not.toHaveProperty('answerCount');
 
     await agent
       .post(`/api/questions/${todayKey}/answer`)
       .set('Origin', 'http://localhost:7073')
-      .send({ value: 126 })
+      .send({ value: 126, timeZone: 'America/Chicago' })
       .expect(409)
       .expect((response) => {
         expect(response.body.code).toBe('ANSWER_ALREADY_SUBMITTED');
       });
 
     await agent
-      .get(`/api/questions/${todayKey}/results`)
+      .get(
+        `/api/questions/${todayKey}/results?timeZone=${encodeURIComponent(
+          'Asia/Tokyo',
+        )}`,
+      )
       .expect(200)
       .expect((response) => {
-        expect(response.body.answerCount).toBe(1);
+        expect(response.body.status).toBe('locked');
+        expect(response.body.timeZone).toBe('America/Chicago');
         expect(response.body.question.key).toBe(todayKey);
+        expect(response.body).not.toHaveProperty('average');
+      });
+
+    await agent
+      .get(
+        `/api/questions/${todayKey}/results?timeZone=${encodeURIComponent(
+          'Not/A_Zone',
+        )}`,
+      )
+      .expect(400)
+      .expect((response) => {
+        expect(response.body.code).toBe('INVALID_TIME_ZONE');
       });
 
     await agent
@@ -285,7 +300,7 @@ describe('How Many, Though? API (e2e)', () => {
     await agent.get('/api/auth/me').expect(200).expect({ user: null });
   });
 
-  it('keeps a historical shared question sealed until another user answers', async () => {
+  it('unlocks a historical question after one answer and keeps answer access private', async () => {
     await questionModel.create({
       key: 'daily-2026-07-01',
       prompt: 'How many coins could you balance on one fingertip?',
@@ -322,24 +337,29 @@ describe('How Many, Though? API (e2e)', () => {
       .post('/api/test/auth/SecondLocker')
       .set('Origin', 'http://localhost:7073')
       .expect(201);
+    await second
+      .get(
+        '/api/questions/daily-2026-07-01/results?timeZone=America%2FNew_York',
+      )
+      .expect(403)
+      .expect((response) => {
+        expect(response.body.code).toBe('ANSWER_REQUIRED');
+      });
 
     await first
       .post('/api/questions/daily-2026-07-01/answer')
       .set('Origin', 'http://localhost:7073')
-      .send({ value: 12 })
+      .send({ value: 12, timeZone: 'America/New_York' })
       .expect(201)
       .expect((response) => {
         expect(response.body).toEqual(
           expect.objectContaining({
-            status: 'locked',
-            userAnswer: 12,
+            status: 'unlocked',
+            average: 12,
             answerCount: 1,
-            requiredAnswerCount: 2,
-            remainingAnswerCount: 1,
           }),
         );
-        expect(response.body).not.toHaveProperty('average');
-        expect(response.body).not.toHaveProperty('leaders');
+        expect(response.body.leaders).toHaveLength(1);
       });
 
     await request(app.getHttpServer())
@@ -354,14 +374,16 @@ describe('How Many, Though? API (e2e)', () => {
     await second
       .post('/api/questions/daily-2026-07-01/answer')
       .set('Origin', 'http://localhost:7073')
-      .send({ value: 20 })
+      .send({ value: 20, timeZone: 'Asia/Tokyo' })
       .expect(201)
       .expect((response) => {
         expect(response.body.status).toBe('unlocked');
         expect(response.body.answerCount).toBe(2);
       });
     await first
-      .get('/api/questions/daily-2026-07-01/results')
+      .get(
+        '/api/questions/daily-2026-07-01/results?timeZone=America%2FLos_Angeles',
+      )
       .expect(200)
       .expect((response) => {
         expect(response.body.status).toBe('unlocked');

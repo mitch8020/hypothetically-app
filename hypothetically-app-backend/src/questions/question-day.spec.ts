@@ -1,8 +1,10 @@
 import {
+  canonicalTimeZone,
+  dailyQuestionUnlockAt,
   isQuestionGenerationHour,
+  nextQuestionDay,
   previousQuestionDay,
   questionDayKey,
-  requiredAnswerCount,
 } from './question-day';
 
 describe('question day rules', () => {
@@ -48,12 +50,38 @@ describe('question day rules', () => {
     ).toBe(true);
   });
 
-  it('moves backward by calendar day and validates thresholds', () => {
+  it('moves across real calendar days', () => {
     expect(previousQuestionDay('2026-03-01')).toBe('2026-02-28');
     expect(previousQuestionDay('2024-03-01')).toBe('2024-02-29');
-    expect(requiredAnswerCount(0)).toBe(1);
-    expect(requiredAnswerCount(1)).toBe(1);
-    expect(requiredAnswerCount(10)).toBe(2);
-    expect(requiredAnswerCount(11)).toBe(3);
+    expect(nextQuestionDay('2026-02-28')).toBe('2026-03-01');
+    expect(nextQuestionDay('2024-02-28')).toBe('2024-02-29');
+  });
+
+  it('finds local midnight in distant and fractional-offset zones', () => {
+    expect(
+      dailyQuestionUnlockAt('2026-07-30', 'America/Los_Angeles').toISOString(),
+    ).toBe('2026-07-31T07:00:00.000Z');
+    expect(
+      dailyQuestionUnlockAt('2026-07-30', 'Asia/Tokyo').toISOString(),
+    ).toBe('2026-07-30T15:00:00.000Z');
+    expect(
+      dailyQuestionUnlockAt('2026-07-30', 'Asia/Kathmandu').toISOString(),
+    ).toBe('2026-07-30T18:15:00.000Z');
+  });
+
+  it('uses the offset in effect after DST changes', () => {
+    expect(
+      dailyQuestionUnlockAt('2026-03-08', 'America/New_York').toISOString(),
+    ).toBe('2026-03-09T04:00:00.000Z');
+    expect(
+      dailyQuestionUnlockAt('2026-11-01', 'America/New_York').toISOString(),
+    ).toBe('2026-11-02T05:00:00.000Z');
+  });
+
+  it('canonicalizes and rejects IANA time zones', () => {
+    expect(canonicalTimeZone('America/Chicago')).toBe('America/Chicago');
+    expect(() => canonicalTimeZone('Not/A_Zone')).toThrow(
+      'Time zone must be a valid IANA time zone.',
+    );
   });
 });

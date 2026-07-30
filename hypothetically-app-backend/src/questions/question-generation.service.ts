@@ -18,23 +18,24 @@ export interface GeneratedQuestion {
 }
 
 const GOOD_QUESTION_EXAMPLES = [
-  { question: QUESTION_CATALOG[0], maximum: 1_000_000 },
-  { question: QUESTION_CATALOG[1], maximum: 1_000_000 },
-  { question: QUESTION_CATALOG[2], maximum: 1_000_000 },
-  { question: QUESTION_CATALOG[5], maximum: 100_000 },
-  { question: QUESTION_CATALOG[8], maximum: 1_000 },
-  { question: QUESTION_CATALOG[11], maximum: 3_600 },
-  { question: QUESTION_CATALOG[15], maximum: 1_000_000 },
-  { question: QUESTION_CATALOG[16], maximum: 100_000 },
-  { question: QUESTION_CATALOG[17], maximum: 1_000 },
-  { question: QUESTION_CATALOG[19], maximum: 100_000 },
-  { question: QUESTION_CATALOG[20], maximum: 100_000 },
-  { question: QUESTION_CATALOG[23], maximum: 1_000_000 },
+  { question: QUESTION_CATALOG[0] },
+  { question: QUESTION_CATALOG[1] },
+  { question: QUESTION_CATALOG[2] },
+  { question: QUESTION_CATALOG[5] },
+  { question: QUESTION_CATALOG[8] },
+  { question: QUESTION_CATALOG[11] },
+  { question: QUESTION_CATALOG[15] },
+  { question: QUESTION_CATALOG[16] },
+  { question: QUESTION_CATALOG[17] },
+  { question: QUESTION_CATALOG[19] },
+  { question: QUESTION_CATALOG[20] },
+  { question: QUESTION_CATALOG[23] },
 ] as const;
 
 function examplesForPrompt(): string {
-  return GOOD_QUESTION_EXAMPLES.map(({ question, maximum }) => {
+  return GOOD_QUESTION_EXAMPLES.map(({ question }) => {
     const answerStyle = 'whole';
+    const maximum = 1_000_000_000;
     return `- ${question.prompt} | unit=${question.unit} | answerStyle=${answerStyle} | maximum=${maximum}`;
   }).join('\n');
 }
@@ -74,11 +75,10 @@ export class QuestionGenerationService {
           role: 'developer',
           content: [
             'Create one playful numeric estimation question for the public game "How Many?".',
-            'The question must begin with "How many", end with a question mark, and invite an ambiguous estimate rather than have one factual correct answer.',
+            'The question must begin with "How many", end with a question mark, and invite an ambiguous and non-deterministic estimate rather than have one factual correct answer.',
             'Make it understandable without specialist knowledge and suitable for a broad, general audience.',
-            'Avoid politics, religion, sex, violence, illegal activity, health diagnoses, protected traits, personal finances, grief, shame, and requests for sensitive personal information.',
+            'Avoid politics, religion, violence, illegal activity, health diagnoses, protected traits, personal finances, grief, shame, and requests for sensitive personal information.',
             'Use a short lowercase unit. Choose "whole" always.',
-            'Choose the smallest round maximum that comfortably covers playful answers. Prefer 1,000, 10,000, 100,000, or 1,000,000; go higher only when the subject realistically needs it.',
             'Do not copy or closely paraphrase an example or recent question.',
             '',
             'Good examples:',
