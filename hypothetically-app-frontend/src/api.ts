@@ -7,6 +7,12 @@ interface ErrorBody {
 
 const QUESTION_TIME_ZONE = 'America/Chicago'
 
+export function browserTimeZone(): string {
+  return (
+    new Intl.DateTimeFormat().resolvedOptions().timeZone || QUESTION_TIME_ZONE
+  )
+}
+
 export class ApiError extends Error {
   readonly status: number
   readonly code?: string
@@ -134,7 +140,7 @@ export async function submitAnswer(
     `/api/questions/${encodeURIComponent(key)}/answer`,
     {
       method: 'POST',
-      body: JSON.stringify({ value }),
+      body: JSON.stringify({ value, timeZone: browserTimeZone() }),
     },
   )
   if (!result) {
@@ -144,8 +150,9 @@ export async function submitAnswer(
 }
 
 export async function getResult(key: string): Promise<QuestionResult> {
+  const search = new URLSearchParams({ timeZone: browserTimeZone() })
   const result = await request<QuestionResult>(
-    `/api/questions/${encodeURIComponent(key)}/results`,
+    `/api/questions/${encodeURIComponent(key)}/results?${search}`,
   )
   if (!result) {
     throw new ApiError('The result did not arrive.', 500)

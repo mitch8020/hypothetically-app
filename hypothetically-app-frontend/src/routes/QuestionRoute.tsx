@@ -6,6 +6,7 @@ import {
   ApiError,
   getCurrentUser,
   getQuestion,
+  getResult,
   getTodayQuestion,
   submitAnswer,
 } from '../api'
@@ -77,6 +78,20 @@ export function QuestionRoute() {
     },
   })
   const question = questionQuery.data
+  const shouldCheckTodayAnswer =
+    key === 'today' && Boolean(userQuery.data && question)
+  const todayResultQuery = useQuery({
+    queryKey: ['question-result', question?.key],
+    queryFn: () => {
+      if (!question) {
+        throw new Error('The question is not ready yet.')
+      }
+      return getResult(question.key)
+    },
+    enabled: shouldCheckTodayAnswer,
+    staleTime: Number.POSITIVE_INFINITY,
+    retry: false,
+  })
   const serverError = useMemo(() => {
     if (!(answerMutation.error instanceof Error)) {
       return null
@@ -94,7 +109,11 @@ export function QuestionRoute() {
     }
   }
 
-  if (questionQuery.isPending || userQuery.isPending) {
+  if (
+    questionQuery.isPending ||
+    userQuery.isPending ||
+    (shouldCheckTodayAnswer && todayResultQuery.isPending)
+  ) {
     return <LoadingState />
   }
   if (questionQuery.isError || !question) {
@@ -128,6 +147,7 @@ export function QuestionRoute() {
   const conflict =
     answerMutation.error instanceof ApiError &&
     answerMutation.error.code === 'ANSWER_ALREADY_SUBMITTED'
+  const alreadyAnswered = Boolean(todayResultQuery.data) || conflict
 
   return (
     <section className="question-page">
@@ -158,6 +178,23 @@ export function QuestionRoute() {
               <span>Sign in with Google</span>
             </a>
             <small>We only keep your first name, last initial, and photo.</small>
+          </>
+        ) : alreadyAnswered ? (
+          <>
+            <span className="answer-panel__kicker">
+              You’ve answered this question already.
+            </span>
+            <p>
+              Your first answer is final. Head back to see where it landed with
+              the crowd.
+            </p>
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => navigate(`/q/${question.key}/results`)}
+            >
+              See your result
+            </button>
           </>
         ) : (
           <>
@@ -195,25 +232,15 @@ export function QuestionRoute() {
               <span id="guess-error" className="input-error" role="alert">
                 {clientError || serverError}
               </span>
-              {conflict ? (
-                <button
-                  className="secondary-button"
-                  type="button"
-                  onClick={() => navigate(`/q/${question.key}/results`)}
-                >
-                  See your locked answer
-                </button>
-              ) : (
-                <button
-                  className="primary-button"
-                  type="submit"
-                  disabled={answerMutation.isPending}
-                >
-                  {answerMutation.isPending
-                    ? 'Placing your answer…'
-                    : 'Lock in my answer'}
-                </button>
-              )}
+              <button
+                className="primary-button"
+                type="submit"
+                disabled={answerMutation.isPending}
+              >
+                {answerMutation.isPending
+                  ? 'Placing your answer…'
+                  : 'Lock in my answer'}
+              </button>
             </form>
           </>
         )}

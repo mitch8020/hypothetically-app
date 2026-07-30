@@ -4,8 +4,16 @@
   min-height: 100svh;
   overflow: hidden;
   background:
-    radial-gradient(circle at 8% 26%, rgba(102, 113, 90, 0.13), transparent 22rem),
-    radial-gradient(circle at 92% 66%, rgba(239, 90, 47, 0.09), transparent 25rem),
+    radial-gradient(
+      circle at 8% 26%,
+      rgba(102, 113, 90, 0.13),
+      transparent 22rem
+    ),
+    radial-gradient(
+      circle at 92% 66%,
+      rgba(239, 90, 47, 0.09),
+      transparent 25rem
+    ),
     var(--mineral);
 }
 
@@ -17,9 +25,15 @@
     linear-gradient(rgba(32, 36, 29, 0.025) 1px, transparent 1px),
     linear-gradient(90deg, rgba(32, 36, 29, 0.018) 1px, transparent 1px);
   background-size: 22px 22px;
-  content: '';
+  content: "";
   pointer-events: none;
-  mask-image: linear-gradient(to bottom, transparent, black 12%, black 88%, transparent);
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    black 12%,
+    black 88%,
+    transparent
+  );
 }
 
 .paper-shape {
@@ -105,7 +119,7 @@
   height: 4px;
   border-radius: 50%;
   background: var(--tangerine);
-  content: '';
+  content: "";
   transform: translateY(-50%);
 }
 
@@ -273,7 +287,7 @@ main {
   letter-spacing: 0.1em;
   line-height: 1.4;
   text-transform: uppercase;
-  transform: rotate(-5deg);
+  transform: rotate(-1.5deg);
 }
 
 .question-card {
@@ -286,7 +300,11 @@ main {
   border-radius: 7px;
   background:
     linear-gradient(123deg, rgba(255, 255, 255, 0.24), transparent 34%),
-    repeating-linear-gradient(0deg, rgba(94, 62, 34, 0.025) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(
+      0deg,
+      rgba(94, 62, 34, 0.025) 0 1px,
+      transparent 1px 4px
+    ),
     var(--apricot);
   box-shadow:
     0 2px 0 rgba(255, 255, 255, 0.8) inset,
@@ -318,7 +336,7 @@ main {
   height: 52%;
   border-radius: 46% 54% 31% 69% / 59% 39% 61% 41%;
   background: var(--moss);
-  content: '';
+  content: "";
   opacity: 0.16;
   transform: rotate(22deg);
 }
@@ -332,7 +350,7 @@ main {
   height: 52%;
   background: var(--tangerine);
   clip-path: polygon(14% 10%, 100% 0, 77% 84%, 24% 100%, 0 48%);
-  content: '';
+  content: "";
   opacity: 0.11;
   transform: rotate(-12deg);
 }
@@ -405,7 +423,7 @@ main {
   width: 37%;
   height: 10px;
   background: var(--moss);
-  content: '';
+  content: "";
 }
 
 .answer-panel__kicker,
@@ -514,7 +532,11 @@ main {
   border: 3px solid var(--moss);
   border-radius: 7px;
   background:
-    repeating-linear-gradient(0deg, rgba(102, 113, 90, 0.035) 0 1px, transparent 1px 5px),
+    repeating-linear-gradient(
+      0deg,
+      rgba(102, 113, 90, 0.035) 0 1px,
+      transparent 1px 5px
+    ),
     var(--paper);
   box-shadow:
     0 0 0 2px var(--paper),
@@ -721,7 +743,11 @@ main {
   border-radius: 6px;
   color: var(--paper);
   background:
-    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.02) 0 1px, transparent 1px 5px),
+    repeating-linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.02) 0 1px,
+      transparent 1px 5px
+    ),
     var(--ink);
   box-shadow: 10px 10px 0 var(--moss);
   text-align: center;
@@ -736,7 +762,7 @@ main {
   height: 2rem;
   border: 2px solid var(--tangerine);
   border-radius: 50%;
-  content: '';
+  content: "";
   opacity: 0.8;
 }
 
@@ -809,8 +835,8 @@ main {
   position: relative;
   height: 114px;
   border-top: 3px solid var(--ink);
-  background:
-    linear-gradient(90deg, var(--ink) 1px, transparent 1px) top / 10% 10px repeat-x;
+  background: linear-gradient(90deg, var(--ink) 1px, transparent 1px) top / 10%
+    10px repeat-x;
 }
 
 .average-marker {
@@ -851,7 +877,8 @@ main {
   gap: 0.3rem;
   opacity: 0;
   transform: translateX(-50%) translateY(14px) rotate(-8deg);
-  animation: token-settle 650ms var(--token-delay) cubic-bezier(0.18, 0.89, 0.3, 1.25) forwards;
+  animation: token-settle 650ms var(--token-delay)
+    cubic-bezier(0.18, 0.89, 0.3, 1.25) forwards;
 }
 
 .answer-token:nth-of-type(even) {
@@ -979,7 +1006,10 @@ main {
 
 .leader-row {
   display: grid;
-  grid-template-columns: 3rem 2.6rem minmax(0, 1fr) minmax(110px, auto) minmax(130px, auto);
+  grid-template-columns: 3rem 2.6rem minmax(0, 1fr) minmax(110px, auto) minmax(
+      130px,
+      auto
+    );
   align-items: center;
   gap: 1rem;
   min-height: 74px;
@@ -1138,7 +1168,7 @@ main {
   position: absolute;
   inset: 1rem;
   border: 2px dashed rgba(32, 36, 29, 0.2);
-  content: '';
+  content: "";
   pointer-events: none;
 }
 
@@ -1204,12 +1234,11 @@ main {
   min-width: min(100%, 280px);
   padding: 1rem 1.5rem;
   border-block: 3px solid var(--ink);
-  background:
-    repeating-linear-gradient(
-      90deg,
-      transparent 0 12px,
-      rgba(102, 113, 90, 0.12) 12px 13px
-    );
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0 12px,
+    rgba(102, 113, 90, 0.12) 12px 13px
+  );
 }
 
 .crowd-ticket strong {

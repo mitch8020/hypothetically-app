@@ -35,9 +35,8 @@ const lockedResult = {
   status: 'locked',
   question: todayQuestion,
   userAnswer: 42,
-  answerCount: 1,
-  requiredAnswerCount: 2,
-  remainingAnswerCount: 1,
+  unlocksAt: '2099-07-29T07:00:00.000Z',
+  timeZone: 'America/Los_Angeles',
 }
 
 const unlockedResult = {
@@ -45,8 +44,6 @@ const unlockedResult = {
   question: todayQuestion,
   average: 58.5,
   answerCount: 2,
-  requiredAnswerCount: 2,
-  remainingAnswerCount: 0,
   leaders: [
     {
       rank: 1,
@@ -85,10 +82,13 @@ async function mockApi(
   page: Page,
   options: {
     signedIn: boolean
+    alreadyAnswered?: boolean
+    unlockAutomatically?: boolean
     onResultsRead?: () => void
     getTodayQuestion?: () => typeof todayQuestion
   },
 ) {
+  let hasAnswered = options.alreadyAnswered ?? false
   await page.route('**/api/**', async (route) => {
     const request = route.request()
     const path = new URL(request.url()).pathname
@@ -126,16 +126,43 @@ async function mockApi(
       path === `/api/questions/${todayQuestion.key}/answer` &&
       method === 'POST'
     ) {
-      expect(request.postDataJSON()).toEqual({ value: 42 })
-      await route.fulfill({ status: 201, json: lockedResult })
+      expect(request.postDataJSON()).toEqual({
+        value: 42,
+        timeZone: expect.stringMatching(/^[A-Za-z_]+(?:\/[A-Za-z_+-]+)+$/),
+      })
+      hasAnswered = true
+      await route.fulfill({
+        status: 201,
+        json: options.unlockAutomatically
+          ? {
+              ...lockedResult,
+              unlocksAt: new Date(Date.now() + 50).toISOString(),
+            }
+          : lockedResult,
+      })
       return
     }
     if (
       path === `/api/questions/${todayQuestion.key}/results` &&
       method === 'GET'
     ) {
+      expect(new URL(request.url()).searchParams.get('timeZone')).toMatch(
+        /^[A-Za-z_]+(?:\/[A-Za-z_+-]+)+$/,
+      )
+      if (!hasAnswered) {
+        await route.fulfill({
+          status: 403,
+          json: {
+            code: 'ANSWER_REQUIRED',
+            message: 'Answer this question before seeing the crowd.',
+          },
+        })
+        return
+      }
       options.onResultsRead?.()
-      await route.fulfill({ json: unlockedResult })
+      await route.fulfill({
+        json: options.alreadyAnswered ? lockedResult : unlockedResult,
+      })
       return
     }
     if (
@@ -228,6 +255,37 @@ test('guest lands on the one shared daily question with an accessible Google ent
   ).toBeVisible()
 })
 
+test('returning user sees the already-answered view on today', async ({
+  page,
+}) => {
+  let resultsReads = 0
+  await mockApi(page, {
+    signedIn: true,
+    alreadyAnswered: true,
+    onResultsRead: () => {
+      resultsReads += 1
+    },
+  })
+
+  await page.goto('/q/today')
+
+  await expect(
+    page.getByText('You’ve answered this question already.'),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('spinbutton', { name: 'Your answer' }),
+  ).toHaveCount(0)
+  expect(resultsReads).toBe(1)
+  expect(await seriousA11yViolations(page)).toEqual([])
+
+  await page.getByRole('button', { name: 'See your result' }).click()
+
+  await expect(page).toHaveURL(`/q/${todayQuestion.key}/results`)
+  await expect(page.getByText('Midnight', { exact: true })).toBeVisible()
+  await expect(page.locator('.average-board')).toHaveCount(0)
+  expect(resultsReads).toBe(1)
+})
+
 test('signed-in user moves from sealed answer to manual crowd unlock and backlog', async ({
   page,
   context,
@@ -253,10 +311,10 @@ test('signed-in user moves from sealed answer to manual crowd unlock and backlog
     page.getByRole('heading', { name: '42 cracks' }),
   ).toBeVisible()
   await expect(
-    page.getByLabel('1 out of 2 answers in'),
+    page.getByLabel(/Crowd results unlock at/),
   ).toBeVisible()
-  await expect(page.getByText(/1 more answer arrives/)).toBeVisible()
-  await expect(page.getByText('The crowd average')).toHaveCount(0)
+  await expect(page.getByText('Midnight', { exact: true })).toBeVisible()
+  await expect(page.locator('.average-board')).toHaveCount(0)
   await expect(page.getByRole('link', { name: 'X' })).toHaveAttribute(
     'href',
     /twitter\.com\/intent\/tweet/,
@@ -283,9 +341,10 @@ test('signed-in user moves from sealed answer to manual crowd unlock and backlog
   })
 
   await page
-    .getByRole('button', { name: 'Check if it’s unlocked' })
+    .getByRole('button', { name: 'Check now' })
     .click()
-  await expect(page.getByText('The crowd average')).toBeVisible()
+  await expect(page.locator('.average-board')).toBeVisible()
+  await expect(page.locator('.average-board strong')).toHaveText('59')
   await expect(
     page.getByRole('region', { name: 'The leaderboard' }),
   ).toBeVisible()
@@ -306,4 +365,27 @@ test('signed-in user moves from sealed answer to manual crowd unlock and backlog
   await expect(
     page.getByRole('heading', { name: previousQuestion.prompt }),
   ).toBeVisible()
+})
+
+test('sealed crowd results reveal automatically after the server unlock time', async ({
+  page,
+}) => {
+  let resultsReads = 0
+  await mockApi(page, {
+    signedIn: true,
+    unlockAutomatically: true,
+    onResultsRead: () => {
+      resultsReads += 1
+    },
+  })
+  await page.goto(`/q/${todayQuestion.key}`)
+
+  await page.getByRole('spinbutton', { name: 'Your answer' }).fill('42')
+  await page.getByRole('button', { name: 'Lock in my answer' }).click()
+
+  await expect(page.getByText('Midnight', { exact: true })).toBeVisible()
+  await expect(page.locator('.average-board')).toBeVisible({
+    timeout: 3_000,
+  })
+  expect(resultsReads).toBe(1)
 })

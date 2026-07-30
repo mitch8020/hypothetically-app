@@ -21,7 +21,7 @@ function copyFallback(value: string): boolean {
 export function ShareQuestion({ question }: ShareQuestionProps) {
   const [announcement, setAnnouncement] = useState('')
   const shareUrl = `${window.location.origin}/q/${encodeURIComponent(question.key)}`
-  const shareText = `${question.prompt} Lock in your answer to help reveal the crowd.`
+  const shareText = `${question.prompt} Lock in your answer before the crowd reveals at midnight.`
   const encodedUrl = encodeURIComponent(shareUrl)
   const encodedText = encodeURIComponent(shareText)
   const targets = useMemo(
@@ -76,8 +76,8 @@ export function ShareQuestion({ question }: ShareQuestionProps) {
       </span>
       <h2 id="share-question-title">Bring a few more guesses in.</h2>
       <p>
-        Share this question with friends. Their answers move the crowd closer
-        to the reveal.
+        Share this question with friends so everyone can answer before their
+        local midnight reveal.
       </p>
       <div className="share-actions">
         {typeof navigator.share === 'function' && (

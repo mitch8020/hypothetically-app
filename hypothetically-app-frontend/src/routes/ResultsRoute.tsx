@@ -1,6 +1,6 @@
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useLocation, useNavigate, useParams } from 'react-router'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   ApiError,
   getPreviousUnansweredQuestion,
@@ -19,13 +19,11 @@ interface ResultLocationState {
   fromSubmission?: boolean
 }
 
+const MAX_TIMER_DELAY = 2_147_000_000
+
 function formatAverage(result: Extract<QuestionResult, { status: 'unlocked' }>) {
   return new Intl.NumberFormat('en-US', {
-    minimumFractionDigits: result.question.precision === 0 ? 1 : 0,
-    maximumFractionDigits:
-      result.question.precision === 0
-        ? 1
-        : Math.min(result.question.precision + 1, 2),
+    maximumFractionDigits: 0,
   }).format(result.average)
 }
 
@@ -39,6 +37,7 @@ export function ResultsRoute() {
   const { key = '' } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
+  const queryClient = useQueryClient()
   const locationState = location.state as ResultLocationState | null
   const initialResult = locationState?.fromSubmission
     ? locationState.result
@@ -53,8 +52,13 @@ export function ResultsRoute() {
   })
   const refresh = useMutation({
     mutationFn: () => getResult(key),
-    onSuccess: (result) => setSubmittedResult(result),
+    onSuccess: (result) => {
+      setSubmittedResult(result)
+      queryClient.setQueryData(['question-result', key], result)
+    },
   })
+  const { error: refreshError, isPending: checking, mutate: refreshResult } =
+    refresh
   const result = submittedResult ?? resultQuery.data
   const backlogQuery = useQuery({
     queryKey: [
@@ -68,6 +72,16 @@ export function ResultsRoute() {
     staleTime: 30_000,
     retry: false,
   })
+
+  useEffect(() => {
+    if (result?.status !== 'locked' || checking || refreshError) return
+    const remaining = new Date(result.unlocksAt).getTime() - Date.now()
+    const timeout = window.setTimeout(
+      () => refreshResult(),
+      Math.min(MAX_TIMER_DELAY, Math.max(1_000, remaining + 250)),
+    )
+    return () => window.clearTimeout(timeout)
+  }, [checking, refreshError, refreshResult, result])
 
   if (!result && resultQuery.isPending) {
     return <LoadingState label="Finding your place in the crowd" />
@@ -98,11 +112,11 @@ export function ResultsRoute() {
     return (
       <LockedResult
         result={result}
-        checking={refresh.isPending}
+        checking={checking}
         checkError={
-          refresh.error instanceof Error ? refresh.error.message : undefined
+          refreshError instanceof Error ? refreshError.message : undefined
         }
-        onCheck={() => refresh.mutate()}
+        onCheck={() => refreshResult()}
         backlogQuery={backlogQuery}
       />
     )

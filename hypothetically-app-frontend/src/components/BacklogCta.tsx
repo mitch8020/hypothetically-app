@@ -12,7 +12,7 @@ export function BacklogCta({ query, waiting = false }: BacklogCtaProps) {
 
   return (
     <section className="backlog-card" aria-label="Previous question">
-      <span>{waiting ? 'While the crowd grows' : 'Still guessing?'}</span>
+      <span>{waiting ? 'While you wait' : 'Still guessing?'}</span>
       {query.isPending ? (
         <p>Checking the question drawer…</p>
       ) : query.data ? (

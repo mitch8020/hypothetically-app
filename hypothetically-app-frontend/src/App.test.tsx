@@ -10,7 +10,16 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
+import { browserTimeZone } from './api'
 import type { PublicQuestion, QuestionResult } from './types'
+
+const testTimeZone = browserTimeZone()
+
+function resultUrl(key: string): string {
+  return `/api/questions/${key}/results?timeZone=${encodeURIComponent(
+    testTimeZone,
+  )}`
+}
 
 const question: PublicQuestion = {
   key: 'daily-2026-07-28',
@@ -28,8 +37,6 @@ const unlockedResult: QuestionResult = {
   question,
   average: 43.3333333333,
   answerCount: 3,
-  requiredAnswerCount: 3,
-  remainingAnswerCount: 0,
   leaders: [
     {
       rank: 1,
@@ -75,9 +82,8 @@ const lockedResult: QuestionResult = {
   status: 'locked',
   question,
   userAnswer: 10,
-  answerCount: 1,
-  requiredAnswerCount: 3,
-  remainingAnswerCount: 2,
+  unlocksAt: '2099-07-29T05:00:00.000Z',
+  timeZone: testTimeZone,
 }
 
 type FetchHandler = (url: string, init?: RequestInit) => Response
@@ -231,7 +237,10 @@ describe('How Many, Though? experience', () => {
         url === `/api/questions/${question.key}/answer` &&
         init?.method === 'POST'
       ) {
-        expect(JSON.parse(String(init.body))).toEqual({ value: 10 })
+        expect(JSON.parse(String(init.body))).toEqual({
+          value: 10,
+          timeZone: testTimeZone,
+        })
         return json(unlockedResult, 201)
       }
       if (
@@ -252,7 +261,7 @@ describe('How Many, Though? experience', () => {
     await user.click(screen.getByRole('button', { name: 'Lock in my answer' }))
 
     expect(await screen.findByText('The crowd average')).toBeInTheDocument()
-    expect(screen.getByText('43.3')).toBeInTheDocument()
+    expect(screen.getByText('43')).toBeInTheDocument()
     expect(
       screen.getByRole('heading', { name: 'The leaderboard' }),
     ).toBeInTheDocument()
@@ -285,7 +294,7 @@ describe('How Many, Though? experience', () => {
       ) {
         return json(lockedResult, 201)
       }
-      if (url === `/api/questions/${question.key}/results`) {
+      if (url === resultUrl(question.key)) {
         resultChecks += 1
         return json(unlockedResult)
       }
@@ -308,8 +317,11 @@ describe('How Many, Though? experience', () => {
     expect(
       await screen.findByRole('heading', { name: '10 doors' }),
     ).toBeInTheDocument()
-    expect(screen.getByLabelText('1 out of 3 answers in')).toBeInTheDocument()
-    expect(screen.getByText(/2 more answers arrive/)).toBeInTheDocument()
+    expect(
+      screen.getByLabelText(/Crowd results unlock at/),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Midnight')).toBeInTheDocument()
+    expect(screen.getByText('your time')).toBeInTheDocument()
     expect(screen.queryByText('The crowd average')).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'X' })).toHaveAttribute(
       'href',
@@ -338,10 +350,93 @@ describe('How Many, Though? experience', () => {
     expect(await screen.findByText('Question link copied.')).toBeInTheDocument()
 
     await user.click(
-      screen.getByRole('button', { name: 'Check if it’s unlocked' }),
+      screen.getByRole('button', { name: 'Check now' }),
     )
     expect(await screen.findByText('The crowd average')).toBeInTheDocument()
     expect(resultChecks).toBe(1)
+  })
+
+  it('automatically reveals the crowd just after the server unlock time', async () => {
+    let resultChecks = 0
+    const unlockingSoon: QuestionResult = {
+      ...lockedResult,
+      unlocksAt: new Date(Date.now() + 50).toISOString(),
+    }
+    installFetch((url, init) => {
+      if (url === '/api/auth/me') return json(currentUser())
+      if (url === `/api/questions/${question.key}`) return json(question)
+      if (
+        url === `/api/questions/${question.key}/answer` &&
+        init?.method === 'POST'
+      ) {
+        return json(unlockingSoon, 201)
+      }
+      if (url === resultUrl(question.key)) {
+        resultChecks += 1
+        return json(unlockedResult)
+      }
+      if (
+        url ===
+        '/api/questions/previous-unanswered?before=2026-07-28'
+      ) {
+        return json(null, 204)
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+    const user = userEvent.setup()
+    renderApp(`/q/${question.key}`)
+
+    await user.type(
+      await screen.findByRole('spinbutton', { name: 'Your answer' }),
+      '10',
+    )
+    await user.click(screen.getByRole('button', { name: 'Lock in my answer' }))
+    expect(await screen.findByText('Midnight')).toBeInTheDocument()
+
+    await waitFor(
+      () => {
+        expect(screen.getByText('The crowd average')).toBeInTheDocument()
+      },
+      { timeout: 2_500 },
+    )
+    expect(resultChecks).toBe(1)
+  })
+
+  it('shows the already-answered view when a signed-in user revisits today', async () => {
+    let resultRequests = 0
+    installFetch((url) => {
+      if (url === '/api/auth/me') return json(currentUser())
+      if (url === '/api/questions/today') return json(question)
+      if (url === resultUrl(question.key)) {
+        resultRequests += 1
+        return json(lockedResult)
+      }
+      if (
+        url ===
+        '/api/questions/previous-unanswered?before=2026-07-28'
+      ) {
+        return json(null, 204)
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+    const user = userEvent.setup()
+    renderApp('/q/today')
+
+    expect(
+      await screen.findByText('You’ve answered this question already.'),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('spinbutton', { name: 'Your answer' }),
+    ).not.toBeInTheDocument()
+
+    await user.click(
+      screen.getByRole('button', { name: 'See your result' }),
+    )
+
+    expect(
+      await screen.findByRole('heading', { name: '10 doors' }),
+    ).toBeInTheDocument()
+    expect(resultRequests).toBe(1)
   })
 
   it('offers the locked result when a different second answer conflicts', async () => {
@@ -372,7 +467,7 @@ describe('How Many, Though? experience', () => {
     await user.click(screen.getByRole('button', { name: 'Lock in my answer' }))
 
     expect(
-      await screen.findByRole('button', { name: 'See your locked answer' }),
+      await screen.findByRole('button', { name: 'See your result' }),
     ).toBeInTheDocument()
   })
 
@@ -380,7 +475,7 @@ describe('How Many, Though? experience', () => {
     let resultRequests = 0
     installFetch((url) => {
       if (url === '/api/auth/me') return json(currentUser())
-      if (url === `/api/questions/${question.key}/results`) {
+      if (url === resultUrl(question.key)) {
         resultRequests += 1
         return json(unlockedResult)
       }
@@ -475,7 +570,7 @@ describe('How Many, Though? experience', () => {
     }
     installFetch((url) => {
       if (url === '/api/auth/me') return json(currentUser())
-      if (url === `/api/questions/${question.key}/results`) {
+      if (url === resultUrl(question.key)) {
         return json(unlockedResult)
       }
       if (

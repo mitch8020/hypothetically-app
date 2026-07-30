@@ -17,6 +17,7 @@ export default defineConfig({
       name: 'desktop',
       use: {
         viewport: { width: 1440, height: 900 },
+        timezoneId: 'America/Los_Angeles',
       },
     },
     {
@@ -24,6 +25,7 @@ export default defineConfig({
       use: {
         ...devices['Pixel 7'],
         channel: 'chrome',
+        timezoneId: 'Asia/Tokyo',
       },
     },
   ],
