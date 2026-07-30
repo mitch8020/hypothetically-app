@@ -173,7 +173,7 @@ The config command creates these files when they do not already exist:
 - Frontend dev: `[frontend-path]/.env.dev`
 - Frontend prod: `[frontend-path]/.env.prod`
 
-Existing files are never overwritten. Add the variables your apps need to the blank files. The deploy command can also inject port-related values from `deploy.envOverrides` in `config/workspace-config.json`.
+Existing files are never overwritten. Add the variables your apps need to the blank files. The deploy command injects port-related values from `deploy.envOverrides` in `config/workspace-config.json` into the child-process environment only; it never writes those values to an environment file.
 
 ## Step 4: Install Dependencies When Needed
 
@@ -242,7 +242,7 @@ Use `deploy.targets` to customize local run targets. The generated config starts
 }
 ```
 
-`npm run deploy` copies each selected env profile to `.env`, applies configured overrides, exports those values to the matching child process, starts the backend, waits for its selected port to accept connections, and then starts the frontend. Stopping the root deploy command stops both process trees.
+`npm run deploy` treats all `.env` and `.env.*` files as read-only. For each app, it loads the base `.env` values, layers the selected profile such as `.env.dev` over them in memory, and then layers configured `deploy.envOverrides` over both for the spawned child process. It does not create, copy, truncate, or rewrite any environment file. Deployment still starts the backend, waits for its selected port to accept connections, and then starts the frontend. Stopping the root deploy command stops both process trees.
 
 For a complete reference, compare against:
 

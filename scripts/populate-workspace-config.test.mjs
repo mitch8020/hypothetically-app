@@ -362,7 +362,7 @@ test("deploy rejects an empty placeholder directory instead of using the root pa
   assert.doesNotMatch(result.stderr, /Missing script/);
 });
 
-test("deploy starts backend and frontend together on their selected ports", { timeout: 15_000 }, async (t) => {
+test("deploy starts both services with layered runtime env without changing env files", { timeout: 15_000 }, async (t) => {
   const fixture = createTempConfig(t);
   const backendPort = await availablePort();
   const frontendPort = await availablePort();
@@ -372,7 +372,13 @@ const role = "${role}";
 const port = Number(process.env.PORT);
 const server = createServer((_request, response) => {
   response.setHeader("content-type", "application/json");
-  response.end(JSON.stringify({ role, port }));
+  response.end(JSON.stringify({
+    role,
+    port,
+    baseOnly: process.env.BASE_ONLY,
+    profileOnly: process.env.PROFILE_ONLY,
+    shared: process.env.SHARED,
+  }));
 });
 server.listen(port, "127.0.0.1", () => console.log(\`[fixture] \${role} listening on \${port}\`));
 setTimeout(() => server.close(), 4000);
@@ -390,6 +396,24 @@ setTimeout(() => server.close(), 4000);
       String(frontendPort),
     ],
   });
+
+  const envContents = new Map();
+  for (const [repoPath, role] of [
+    [fixture.backendPath, "backend"],
+    [fixture.frontendPath, "frontend"],
+  ]) {
+    const files = {
+      ".env": `BASE_ONLY=${role}-base\nSHARED=${role}-base\nPORT=1\n`,
+      ".env.dev": `PROFILE_ONLY=${role}-dev\nSHARED=${role}-dev\nPORT=2\n`,
+      ".env.prod": `PROD_ONLY=${role}-prod\n`,
+      ".env.local": `LOCAL_ONLY=${role}-local\n`,
+    };
+    for (const [name, content] of Object.entries(files)) {
+      const filePath = path.join(repoPath, name);
+      writeFileSync(filePath, content);
+      envContents.set(filePath, content);
+    }
+  }
 
   const child = spawn(process.execPath, [deployScriptPath, "--target", "dev"], {
     cwd: rootDir,
@@ -410,13 +434,32 @@ setTimeout(() => server.close(), 4000);
     waitForJson(`http://127.0.0.1:${backendPort}`, () => output),
     waitForJson(`http://127.0.0.1:${frontendPort}`, () => output),
   ]);
-  assert.deepEqual(backend, { role: "backend", port: backendPort });
-  assert.deepEqual(frontend, { role: "frontend", port: frontendPort });
+  assert.deepEqual(backend, {
+    role: "backend",
+    port: backendPort,
+    baseOnly: "backend-base",
+    profileOnly: "backend-dev",
+    shared: "backend-dev",
+  });
+  assert.deepEqual(frontend, {
+    role: "frontend",
+    port: frontendPort,
+    baseOnly: "frontend-base",
+    profileOnly: "frontend-dev",
+    shared: "frontend-dev",
+  });
 
   const exit = await close;
   assert.equal(exit.code, 0, output);
   assert.match(output, new RegExp(`backend listening on ${backendPort}`));
   assert.match(output, new RegExp(`frontend listening on ${frontendPort}`));
+  for (const [filePath, content] of envContents) {
+    assert.equal(
+      readFileSync(filePath, "utf8"),
+      content,
+      `${filePath} must remain unchanged`,
+    );
+  }
 });
 
 test("creates missing env profiles as blank files", (t) => {

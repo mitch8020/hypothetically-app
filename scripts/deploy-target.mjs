@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn, spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { createConnection } from "node:net";
 import path from "node:path";
 import process from "node:process";
@@ -64,18 +64,6 @@ function ensureBranch(repoPath, branch, dryRun) {
   if (!dryRun) {
     runGit(["checkout", branch], repoPath, true);
   }
-}
-
-function upsertEnv(content, key, value) {
-  const lines = content.replace(/\r\n/g, "\n").split("\n");
-  const matcher = new RegExp(`^\\s*${key}\\s*=`);
-  const line = `${key}=${value}`;
-  const idx = lines.findIndex((entry) => matcher.test(entry));
-
-  if (idx >= 0) lines[idx] = line;
-  else lines.push(line);
-
-  return `${lines.filter((entry, i, arr) => !(i === arr.length - 1 && entry === "")).join("\n")}\n`;
 }
 
 function deepValue(vars, key) {
@@ -187,6 +175,27 @@ function parseEnv(content) {
   }
 
   return values;
+}
+
+function readEnvFile(filePath) {
+  if (!existsSync(filePath)) return {};
+  return parseEnv(readFileSync(filePath, "utf8"));
+}
+
+function buildRuntimeEnv({ baseEnvPath, profileEnvPath, overrides, vars }) {
+  const renderedOverrides = Object.fromEntries(
+    Object.entries(overrides).map(([key, value]) => [
+      key,
+      applyTemplate(value, vars),
+    ]),
+  );
+
+  return {
+    ...process.env,
+    ...readEnvFile(baseEnvPath),
+    ...readEnvFile(profileEnvPath),
+    ...renderedOverrides,
+  };
 }
 
 function readRepoPackage(repoKey, repoPath) {
@@ -340,19 +349,19 @@ async function main() {
     }
 
     if (opts.dryRun) {
-      console.log(`[dry-run] copy ${state.profileSrc} -> ${state.envDest}`);
+      console.log(
+        `[dry-run] read ${state.envDest} and ${state.profileSrc}; environment files remain unchanged`,
+      );
       continue;
     }
 
-    copyFileSync(state.profileSrc, state.envDest);
-
     const overrides = config.deploy?.envOverrides?.[repoKey] || {};
-    let envContent = readFileSync(state.envDest, "utf8");
-    for (const [key, value] of Object.entries(overrides)) {
-      envContent = upsertEnv(envContent, key, applyTemplate(value, vars));
-    }
-    writeFileSync(state.envDest, envContent, "utf8");
-    state.runtimeEnv = { ...process.env, ...parseEnv(envContent) };
+    state.runtimeEnv = buildRuntimeEnv({
+      baseEnvPath: state.envDest,
+      profileEnvPath: state.profileSrc,
+      overrides,
+      vars,
+    });
   }
 
   if (repoKeys.length === 1) {
