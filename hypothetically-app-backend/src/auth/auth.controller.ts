@@ -12,6 +12,7 @@ import { ConfigService } from '@nestjs/config';
 import { AuthGuard } from '@nestjs/passport';
 import type { Request, Response } from 'express';
 import { UsersService } from '../users/users.service';
+import { AuthSessionService } from './auth-session.service';
 import { GoogleCallbackExceptionFilter } from './google-callback-exception.filter';
 import { GoogleAuthGuard } from './google-auth.guard';
 
@@ -20,6 +21,7 @@ export class AuthController {
   constructor(
     private readonly config: ConfigService,
     private readonly usersService: UsersService,
+    private readonly authSession: AuthSessionService,
   ) {}
 
   @Get('me')
@@ -51,21 +53,7 @@ export class AuthController {
       return;
     }
 
-    await new Promise<void>((resolve, reject) => {
-      request.session.regenerate((regenerateError) => {
-        if (regenerateError) {
-          reject(this.asError(regenerateError, 'Could not renew the session.'));
-          return;
-        }
-        request.login(user, (loginError) => {
-          if (loginError) {
-            reject(this.asError(loginError, 'Could not complete sign-in.'));
-            return;
-          }
-          resolve();
-        });
-      });
-    });
+    await this.authSession.signIn(request, user);
 
     response.redirect(
       new URL(
@@ -81,26 +69,8 @@ export class AuthController {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<void> {
-    await new Promise<void>((resolve, reject) => {
-      request.logout((logoutError) => {
-        if (logoutError) {
-          reject(this.asError(logoutError, 'Could not sign out.'));
-          return;
-        }
-        request.session.destroy((destroyError) => {
-          if (destroyError) {
-            reject(this.asError(destroyError, 'Could not clear the session.'));
-            return;
-          }
-          resolve();
-        });
-      });
-    });
+    await this.authSession.signOut(request);
     response.clearCookie('hmt.sid');
     response.status(204).send();
-  }
-
-  private asError(value: unknown, fallbackMessage: string): Error {
-    return value instanceof Error ? value : new Error(fallbackMessage);
   }
 }
