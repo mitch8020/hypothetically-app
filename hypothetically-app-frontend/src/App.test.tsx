@@ -36,28 +36,32 @@ const question: PublicQuestion = {
 const unlockedResult: QuestionResult = {
   status: 'unlocked',
   question,
-  average: 43.3333333333,
+  median: 20,
   answerCount: 3,
+  answerClusters: [
+    { center: 15, count: 2, minimum: 10, maximum: 20 },
+    { center: 100, count: 1, minimum: 100, maximum: 100 },
+  ],
   leaders: [
     {
       rank: 1,
       displayName: 'Blair B.',
       value: 20,
-      distanceFromAverage: 23.3333333333,
+      distanceFromMedian: 0,
       isCurrentUser: false,
     },
     {
       rank: 2,
       displayName: 'Alex A.',
       value: 10,
-      distanceFromAverage: 33.3333333333,
+      distanceFromMedian: 10,
       isCurrentUser: true,
     },
     {
       rank: 3,
       displayName: 'Casey C.',
       value: 100,
-      distanceFromAverage: 56.6666666667,
+      distanceFromMedian: 80,
       isCurrentUser: false,
     },
   ],
@@ -65,7 +69,7 @@ const unlockedResult: QuestionResult = {
     rank: 2,
     displayName: 'Alex A.',
     value: 10,
-    distanceFromAverage: 33.3333333333,
+    distanceFromMedian: 10,
     distanceToWinner: 10,
     isCurrentUser: true,
   },
@@ -73,7 +77,7 @@ const unlockedResult: QuestionResult = {
     rank: 1,
     displayName: 'Blair B.',
     value: 20,
-    distanceFromAverage: 23.3333333333,
+    distanceFromMedian: 0,
     isCurrentUser: false,
   },
   computedAt: '2026-07-28T12:00:00.000Z',
@@ -246,7 +250,7 @@ describe('How Many, Though? experience', () => {
       }
       if (
         url ===
-        '/api/questions/previous-unanswered?before=2026-07-28'
+        `/api/questions/random?exclude=${question.key}`
       ) {
         return json(null, 204)
       }
@@ -261,8 +265,8 @@ describe('How Many, Though? experience', () => {
     await user.type(input, '10')
     await user.click(screen.getByRole('button', { name: 'Lock in my answer' }))
 
-    expect(await screen.findByText('The crowd average')).toBeInTheDocument()
-    expect(screen.getByText('43')).toBeInTheDocument()
+    expect(await screen.findByText('The crowd median')).toBeInTheDocument()
+    expect(screen.getByText('20', { selector: '.median-board strong' })).toBeInTheDocument()
     expect(
       screen.getByRole('heading', { name: 'The leaderboard' }),
     ).toBeInTheDocument()
@@ -301,7 +305,7 @@ describe('How Many, Though? experience', () => {
       }
       if (
         url ===
-        '/api/questions/previous-unanswered?before=2026-07-28'
+        `/api/questions/random?exclude=${question.key}`
       ) {
         return json(null, 204)
       }
@@ -323,7 +327,7 @@ describe('How Many, Though? experience', () => {
     ).toBeInTheDocument()
     expect(screen.getByText('Midnight')).toBeInTheDocument()
     expect(screen.getByText('your time')).toBeInTheDocument()
-    expect(screen.queryByText('The crowd average')).not.toBeInTheDocument()
+    expect(screen.queryByText('The crowd median')).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'X' })).toHaveAttribute(
       'href',
       expect.stringContaining('twitter.com/intent/tweet'),
@@ -353,7 +357,7 @@ describe('How Many, Though? experience', () => {
     await user.click(
       screen.getByRole('button', { name: 'Check now' }),
     )
-    expect(await screen.findByText('The crowd average')).toBeInTheDocument()
+    expect(await screen.findByText('The crowd median')).toBeInTheDocument()
     expect(resultChecks).toBe(1)
   })
 
@@ -378,7 +382,7 @@ describe('How Many, Though? experience', () => {
       }
       if (
         url ===
-        '/api/questions/previous-unanswered?before=2026-07-28'
+        `/api/questions/random?exclude=${question.key}`
       ) {
         return json(null, 204)
       }
@@ -396,7 +400,7 @@ describe('How Many, Though? experience', () => {
 
     await waitFor(
       () => {
-        expect(screen.getByText('The crowd average')).toBeInTheDocument()
+        expect(screen.getByText('The crowd median')).toBeInTheDocument()
       },
       { timeout: 2_500 },
     )
@@ -414,7 +418,7 @@ describe('How Many, Though? experience', () => {
       }
       if (
         url ===
-        '/api/questions/previous-unanswered?before=2026-07-28'
+        `/api/questions/random?exclude=${question.key}`
       ) {
         return json(null, 204)
       }
@@ -482,7 +486,7 @@ describe('How Many, Though? experience', () => {
       }
       if (
         url ===
-        '/api/questions/previous-unanswered?before=2026-07-28'
+        `/api/questions/random?exclude=${question.key}`
       ) {
         return json(null, 204)
       }
@@ -491,7 +495,7 @@ describe('How Many, Though? experience', () => {
 
     renderApp(`/q/${question.key}/results`)
 
-    expect(await screen.findByText('The crowd average')).toBeInTheDocument()
+    expect(await screen.findByText('The crowd median')).toBeInTheDocument()
     await new Promise((resolve) => setTimeout(resolve, 30))
     expect(resultRequests).toBe(1)
   })
@@ -561,7 +565,7 @@ describe('How Many, Though? experience', () => {
     ).toHaveAttribute('href', '/api/auth/google?returnTo=%2Fq%2Ftoday')
   })
 
-  it('navigates to the nearest older unanswered question', async () => {
+  it('navigates to a random unanswered question', async () => {
     const olderQuestion: PublicQuestion = {
       ...question,
       key: 'daily-2026-07-27',
@@ -574,10 +578,7 @@ describe('How Many, Though? experience', () => {
       if (url === resultUrl(question.key)) {
         return json(unlockedResult)
       }
-      if (
-        url ===
-        '/api/questions/previous-unanswered?before=2026-07-28'
-      ) {
+      if (url === `/api/questions/random?exclude=${question.key}`) {
         return json(olderQuestion)
       }
       if (url === `/api/questions/${olderQuestion.key}`) {
@@ -590,7 +591,7 @@ describe('How Many, Though? experience', () => {
 
     await user.click(
       await screen.findByRole('button', {
-        name: 'Answer an earlier question',
+        name: 'Answer a random question',
       }),
     )
 
@@ -682,11 +683,12 @@ describe('How Many, Though? experience', () => {
     const singleAnswerResult: QuestionResult = {
       status: 'unlocked',
       question,
-      average: 42,
+      median: 42,
       answerCount: 1,
-      leaders: [{ rank: 1, displayName: 'Alex A.', value: 42, distanceFromAverage: 0, isCurrentUser: true }],
-      userEntry: { rank: 2, displayName: 'Jamie J.', value: 80, distanceFromAverage: 38, distanceToWinner: 38, isCurrentUser: false },
-      winningEntry: { rank: 1, displayName: 'Alex A.', value: 42, distanceFromAverage: 0, isCurrentUser: true },
+      answerClusters: [{ center: 42, count: 1, minimum: 42, maximum: 42 }],
+      leaders: [{ rank: 1, displayName: 'Alex A.', value: 42, distanceFromMedian: 0, isCurrentUser: true }],
+      userEntry: { rank: 2, displayName: 'Jamie J.', value: 80, distanceFromMedian: 38, distanceToWinner: 38, isCurrentUser: false },
+      winningEntry: { rank: 1, displayName: 'Alex A.', value: 42, distanceFromMedian: 0, isCurrentUser: true },
       computedAt: '2026-07-28T12:00:00.000Z',
     }
     installFetch((url) => {
@@ -698,7 +700,7 @@ describe('How Many, Though? experience', () => {
           : json(singleAnswerResult)
       }
       if (url === `/api/questions/${question.key}`) return json(question)
-      if (url === '/api/questions/previous-unanswered?before=2026-07-28') return json(null, 204)
+      if (url === `/api/questions/random?exclude=${question.key}`) return json(null, 204)
       throw new Error(`Unexpected request: ${url}`)
     })
     const user = userEvent.setup()
@@ -717,13 +719,13 @@ describe('How Many, Though? experience', () => {
           ? json({ message: 'temporary failure' }, 500)
           : json(singleAnswerResult)
       }
-      if (url === '/api/questions/previous-unanswered?before=2026-07-28') return json(null, 204)
+      if (url === `/api/questions/random?exclude=${question.key}`) return json(null, 204)
       throw new Error(`Unexpected request: ${url}`)
     })
     renderApp(`/q/${question.key}/results`)
     expect(await screen.findByRole('heading', { name: 'The numbers got crossed.' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Try again' }))
-    expect(await screen.findByText('The crowd average')).toBeInTheDocument()
+    expect(await screen.findByText('The crowd median')).toBeInTheDocument()
 
     cleanup()
     let lockedAttempts = 0
@@ -735,7 +737,7 @@ describe('How Many, Though? experience', () => {
           ? json(lockedResult)
           : json({ message: 'still sealed' }, 503)
       }
-      if (url === '/api/questions/previous-unanswered?before=2026-07-28') return json(null, 204)
+      if (url === `/api/questions/random?exclude=${question.key}`) return json(null, 204)
       throw new Error(`Unexpected request: ${url}`)
     })
     renderApp(`/q/${question.key}/results`)

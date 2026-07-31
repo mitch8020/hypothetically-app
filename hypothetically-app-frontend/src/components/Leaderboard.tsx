@@ -32,8 +32,8 @@ function LeaderRow({
         <small>{question.unit}</small>
       </span>
       <span className="leader-distance">
-        <strong>±{formatValue(entry.distanceFromAverage, question.precision + 1)}</strong>
-        <small>from average</small>
+        <strong>±{formatValue(entry.distanceFromMedian, question.precision + 1)}</strong>
+        <small>from median</small>
       </span>
     </li>
   )

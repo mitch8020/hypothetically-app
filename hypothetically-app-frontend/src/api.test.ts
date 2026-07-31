@@ -3,6 +3,8 @@ import {
   ApiError,
   browserTimeZone,
   getCurrentUser,
+  getArchive,
+  getRandomUnansweredQuestion,
   getPreviousUnansweredQuestion,
   getQuestion,
   getResult,
@@ -107,6 +109,31 @@ describe('frontend API client', () => {
     await expect(getPreviousUnansweredQuestion()).resolves.toBeNull()
     await expect(getPreviousUnansweredQuestion('2026-07-28')).resolves.toEqual(question)
     expect(fetchMock.mock.calls[5][0]).toBe('/api/questions/previous-unanswered?before=2026-07-28')
+  })
+
+  it('loads random unanswered questions and archive filters', async () => {
+    const archive = { questions: [], total: 0 }
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(response(question))
+      .mockResolvedValueOnce(response(archive))
+      .mockResolvedValueOnce(response(archive))
+      .mockResolvedValueOnce(response(null, 204))
+      .mockResolvedValueOnce(response(null, 204))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(getRandomUnansweredQuestion()).resolves.toEqual(question)
+    await expect(getArchive()).resolves.toEqual(archive)
+    await expect(getArchive('answered', 'food')).resolves.toEqual(archive)
+    await expect(getRandomUnansweredQuestion('daily / key')).resolves.toBeNull()
+    await expect(getArchive()).rejects.toMatchObject({ status: 500 })
+
+    expect(fetchMock.mock.calls[1][0]).toBe('/api/questions/archive')
+    expect(fetchMock.mock.calls[2][0]).toBe(
+      '/api/questions/archive?status=answered&topic=food',
+    )
+    expect(fetchMock.mock.calls[3][0]).toBe(
+      '/api/questions/random?exclude=daily%20%2F%20key',
+    )
   })
 
   it('falls back from a legacy today route and preserves non-legacy failures', async () => {

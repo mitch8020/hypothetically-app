@@ -78,21 +78,68 @@ describe('presentational components and states', () => {
 
     render(
       <AnswerLine
-        average={10}
+        median={10}
         unit="doors"
         entries={[
-          { rank: 1, displayName: 'Alex A.', value: 10, distanceFromAverage: 0, isCurrentUser: true },
-          { rank: 1, displayName: 'Alex A.', value: 10, distanceFromAverage: 0, isCurrentUser: true },
+          { rank: 1, displayName: 'Alex A.', value: 10, distanceFromMedian: 0, isCurrentUser: true },
+          { rank: 1, displayName: 'Alex A.', value: 10, distanceFromMedian: 0, isCurrentUser: true },
         ]}
       />,
     )
-    expect(screen.getAllByTitle('Alex A.: 10 doors')).toHaveLength(1)
-    expect(screen.getByText('crowd')).toBeInTheDocument()
+    expect(screen.getAllByRole('img')).toHaveLength(1)
+    expect(screen.getByRole('img', { name: '2 answers at 10 doors' })).toBeInTheDocument()
+    expect(screen.queryByText('Alex A.')).not.toBeInTheDocument()
+    expect(screen.getByText('10', { selector: '.median-marker strong' })).toBeInTheDocument()
+    expect(screen.getByText('Median')).toBeInTheDocument()
+    render(
+      <AnswerLine
+        median={2}
+        unit="doors"
+        entries={[
+          { rank: 1, displayName: 'Alex A.', value: 2, distanceFromMedian: 0, isCurrentUser: true },
+          { rank: 2, displayName: 'Jamie J.', value: 1, distanceFromMedian: 1, isCurrentUser: false },
+        ]}
+      />,
+    )
+  })
+
+  it('renders only the endpoints of each horizontal answer cluster', () => {
+    render(
+      <AnswerLine
+        median={32}
+        unit="answers"
+        entries={[]}
+        clusters={[
+          { center: 1, count: 1, minimum: 1, maximum: 1 },
+          { center: 2.5, count: 2, minimum: 2, maximum: 3 },
+          { center: 5.5, count: 4, minimum: 4, maximum: 7 },
+          { center: 11.5, count: 8, minimum: 8, maximum: 15 },
+          { center: 23.5, count: 16, minimum: 16, maximum: 31 },
+        ]}
+      />,
+    )
+
+    expect(
+      document.querySelectorAll('.answer-cluster'),
+    ).toHaveLength(5)
+    expect(document.querySelectorAll('.answer-dot')).toHaveLength(9)
+    expect(document.querySelectorAll('.answer-cluster__range')).toHaveLength(5)
+    expect(
+      [...document.querySelectorAll<HTMLElement>('.answer-cluster')].map(
+        (cluster) => [cluster.dataset.minimum, cluster.dataset.maximum],
+      ),
+    ).toEqual([
+      ['1', '1'],
+      ['2', '3'],
+      ['4', '7'],
+      ['8', '15'],
+      ['16', '31'],
+    ])
   })
 
   it('renders leaderboard rows with and without a pinned user', () => {
-    const leader = { rank: 1, displayName: 'Leader L.', value: 42, distanceFromAverage: 0, isCurrentUser: true }
-    const user = { rank: 3, displayName: 'Alex A.', value: 99, distanceFromAverage: 57, isCurrentUser: true }
+    const leader = { rank: 1, displayName: 'Leader L.', value: 42, distanceFromMedian: 0, isCurrentUser: true }
+    const user = { rank: 3, displayName: 'Alex A.', value: 99, distanceFromMedian: 57, isCurrentUser: true }
     const { rerender } = render(<Leaderboard leaders={[leader]} userEntry={leader} question={question} />)
     expect(screen.getByText('You')).toBeInTheDocument()
     expect(screen.queryByText('Your place')).not.toBeInTheDocument()
@@ -104,12 +151,13 @@ describe('presentational components and states', () => {
   it('renders backlog waiting, pending, available, and complete states', () => {
     const navigate = vi.fn()
     withRouter(<BacklogCta query={queryResult({ isPending: true })} waiting />)
-    expect(screen.getByText(/Checking the question drawer/)).toBeInTheDocument()
+    expect(screen.getByText(/Shuffling the unanswered deck/)).toBeInTheDocument()
     cleanup()
     withRouter(<><BacklogCta query={queryResult({ data: question })} /><LocationProbe /></>)
     expect(screen.getByText(/another unanswered question/)).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Answer an earlier question' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Answer a random question' }))
     expect(screen.getByTestId('location')).toHaveTextContent('/q/daily-2026-07-28')
+    expect(screen.getByRole('link', { name: 'See the archive' })).toHaveAttribute('href', '/archive')
     cleanup()
     withRouter(<BacklogCta query={queryResult({ data: null })} />)
     expect(screen.getByText(/caught up/)).toBeInTheDocument()
@@ -163,6 +211,8 @@ describe('presentational components and states', () => {
     expect(await screen.findByText('Share sheet opened.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Copy question link' }))
     expect(await screen.findByText('Question link copied.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Copy question link' }))
+    await new Promise((resolve) => setTimeout(resolve, 1_900))
 
     share.mockRejectedValueOnce(new DOMException('cancelled', 'AbortError'))
     await user.click(screen.getByRole('button', { name: 'Share from this device' }))

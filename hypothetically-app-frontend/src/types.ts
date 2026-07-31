@@ -16,13 +16,43 @@ export interface PublicQuestion {
   dayKey?: string
 }
 
+export const QUESTION_TOPIC_VALUES = [
+  'food',
+  'sports',
+  'home',
+  'everyday',
+  'creative',
+  'nature',
+  'other',
+] as const
+
+export type QuestionTopic = (typeof QUESTION_TOPIC_VALUES)[number]
+export type ArchiveStatus = 'all' | 'answered' | 'unanswered'
+
+export interface ArchiveQuestion extends PublicQuestion {
+  topic: QuestionTopic
+  answered: boolean
+}
+
+export interface ArchiveResponse {
+  questions: ArchiveQuestion[]
+  total: number
+}
+
 export interface LeaderboardEntry {
   rank: number
   displayName: string
   avatarUrl?: string
   value: number
-  distanceFromAverage: number
+  distanceFromMedian: number
   isCurrentUser: boolean
+}
+
+export interface AnswerCluster {
+  center: number
+  count: number
+  minimum: number
+  maximum: number
 }
 
 export interface LockedQuestionResult {
@@ -36,8 +66,9 @@ export interface LockedQuestionResult {
 export interface UnlockedQuestionResult {
   status: 'unlocked'
   question: PublicQuestion
-  average: number
+  median: number
   answerCount: number
+  answerClusters: AnswerCluster[]
   leaders: LeaderboardEntry[]
   userEntry: LeaderboardEntry & { distanceToWinner: number }
   winningEntry: LeaderboardEntry

@@ -42,21 +42,26 @@ const lockedResult = {
 const unlockedResult = {
   status: 'unlocked',
   question: todayQuestion,
-  average: 58.5,
-  answerCount: 2,
+  median: 58.5,
+  answerCount: 5,
+  answerClusters: [
+    { center: 42, count: 1, minimum: 42, maximum: 42 },
+    { center: 58.5, count: 3, minimum: 57, maximum: 60 },
+    { center: 75, count: 1, minimum: 75, maximum: 75 },
+  ],
   leaders: [
     {
       rank: 1,
       displayName: 'Browser T.',
       value: 42,
-      distanceFromAverage: 16.5,
+      distanceFromMedian: 16.5,
       isCurrentUser: true,
     },
     {
       rank: 1,
       displayName: 'Friend F.',
       value: 75,
-      distanceFromAverage: 16.5,
+      distanceFromMedian: 16.5,
       isCurrentUser: false,
     },
   ],
@@ -64,7 +69,7 @@ const unlockedResult = {
     rank: 1,
     displayName: 'Browser T.',
     value: 42,
-    distanceFromAverage: 16.5,
+    distanceFromMedian: 16.5,
     distanceToWinner: 0,
     isCurrentUser: true,
   },
@@ -72,7 +77,7 @@ const unlockedResult = {
     rank: 1,
     displayName: 'Browser T.',
     value: 42,
-    distanceFromAverage: 16.5,
+    distanceFromMedian: 16.5,
     isCurrentUser: true,
   },
   computedAt: '2026-07-28T16:00:00.000Z',
@@ -172,6 +177,10 @@ async function mockApi(
       await route.fulfill({ json: previousQuestion })
       return
     }
+    if (path === '/api/questions/random' && method === 'GET') {
+      await route.fulfill({ json: previousQuestion })
+      return
+    }
     if (
       path === `/api/questions/${previousQuestion.key}` &&
       method === 'GET'
@@ -198,13 +207,26 @@ function seriousA11yViolations(page: Page) {
 async function expectAnswerLineLabelsToBeSeparated(page: Page) {
   const [headingBox, markerBox] = await Promise.all([
     page.locator('.answer-line figcaption strong').boundingBox(),
-    page.locator('.average-marker b').boundingBox(),
+    page.locator('.median-marker b').boundingBox(),
   ])
 
   expect(headingBox).not.toBeNull()
   expect(markerBox).not.toBeNull()
   expect(headingBox!.y + headingBox!.height + 4).toBeLessThanOrEqual(
     markerBox!.y,
+  )
+}
+
+async function expectCrowdTicketLabelsToBeSeparated(page: Page) {
+  const [titleBox, subtitleBox] = await Promise.all([
+    page.locator('.crowd-ticket strong').boundingBox(),
+    page.locator('.crowd-ticket > span').boundingBox(),
+  ])
+
+  expect(titleBox).not.toBeNull()
+  expect(subtitleBox).not.toBeNull()
+  expect(titleBox!.y + titleBox!.height + 4).toBeLessThanOrEqual(
+    subtitleBox!.y,
   )
 }
 
@@ -282,7 +304,8 @@ test('returning user sees the already-answered view on today', async ({
 
   await expect(page).toHaveURL(`/q/${todayQuestion.key}/results`)
   await expect(page.getByText('Midnight', { exact: true })).toBeVisible()
-  await expect(page.locator('.average-board')).toHaveCount(0)
+  await expectCrowdTicketLabelsToBeSeparated(page)
+  await expect(page.locator('.median-board')).toHaveCount(0)
   expect(resultsReads).toBe(1)
 })
 
@@ -314,7 +337,8 @@ test('signed-in user moves from sealed answer to manual crowd unlock and backlog
     page.getByLabel(/Crowd results unlock at/),
   ).toBeVisible()
   await expect(page.getByText('Midnight', { exact: true })).toBeVisible()
-  await expect(page.locator('.average-board')).toHaveCount(0)
+  await expectCrowdTicketLabelsToBeSeparated(page)
+  await expect(page.locator('.median-board')).toHaveCount(0)
   await expect(page.getByRole('link', { name: 'X' })).toHaveAttribute(
     'href',
     /twitter\.com\/intent\/tweet/,
@@ -343,8 +367,14 @@ test('signed-in user moves from sealed answer to manual crowd unlock and backlog
   await page
     .getByRole('button', { name: 'Check now' })
     .click()
-  await expect(page.locator('.average-board')).toBeVisible()
-  await expect(page.locator('.average-board strong')).toHaveText('59')
+  await expect(page.locator('.median-board')).toBeVisible()
+  await expect(page.locator('.median-board strong')).toHaveText('59')
+  await expect(page.locator('.answer-cluster')).toHaveCount(3)
+  await expect(page.locator('.answer-dot')).toHaveCount(4)
+  await expect(page.locator('.answer-cluster').nth(1).locator('.answer-dot')).toHaveCount(2)
+  await expect(page.locator('.median-marker b')).toHaveText('Median')
+  await expect(page.locator('.median-marker i')).toHaveCount(1)
+  await expect(page.locator('.answer-token')).toHaveCount(0)
   await expect(
     page.getByRole('region', { name: 'The leaderboard' }),
   ).toBeVisible()
@@ -359,7 +389,7 @@ test('signed-in user moves from sealed answer to manual crowd unlock and backlog
   })
 
   await page
-    .getByRole('button', { name: 'Answer an earlier question' })
+    .getByRole('button', { name: 'Answer a random question' })
     .click()
   await expect(page).toHaveURL(`/q/${previousQuestion.key}`)
   await expect(
@@ -384,7 +414,7 @@ test('sealed crowd results reveal automatically after the server unlock time', a
   await page.getByRole('button', { name: 'Lock in my answer' }).click()
 
   await expect(page.getByText('Midnight', { exact: true })).toBeVisible()
-  await expect(page.locator('.average-board')).toBeVisible({
+  await expect(page.locator('.median-board')).toBeVisible({
     timeout: 3_000,
   })
   expect(resultsReads).toBe(1)

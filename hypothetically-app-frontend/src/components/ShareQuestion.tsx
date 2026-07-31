@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { PublicQuestion } from '../types'
 
 interface ShareQuestionProps {
@@ -20,6 +20,8 @@ function copyFallback(value: string): boolean {
 
 export function ShareQuestion({ question }: ShareQuestionProps) {
   const [announcement, setAnnouncement] = useState('')
+  const [copied, setCopied] = useState(false)
+  const copiedResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const shareUrl = `${window.location.origin}/q/${encodeURIComponent(question.key)}`
   const shareText = `${question.prompt} Lock in your answer before the crowd reveals at midnight.`
   const encodedUrl = encodeURIComponent(shareUrl)
@@ -40,6 +42,13 @@ export function ShareQuestion({ question }: ShareQuestionProps) {
       },
     ],
     [encodedText, encodedUrl],
+  )
+
+  useEffect(
+    () => () => {
+      if (copiedResetTimer.current) clearTimeout(copiedResetTimer.current)
+    },
+    [],
   )
 
   async function shareFromDevice() {
@@ -63,8 +72,15 @@ export function ShareQuestion({ question }: ShareQuestionProps) {
       } else if (!copyFallback(shareUrl)) {
         throw new Error('Copy was unavailable.')
       }
+      setCopied(true)
+      if (copiedResetTimer.current) clearTimeout(copiedResetTimer.current)
+      copiedResetTimer.current = setTimeout(() => {
+        setCopied(false)
+        copiedResetTimer.current = null
+      }, 1800)
       setAnnouncement('Question link copied.')
     } catch {
+      setCopied(false)
       setAnnouncement('Copy did not work. Use one of the share links instead.')
     }
   }
@@ -90,11 +106,13 @@ export function ShareQuestion({ question }: ShareQuestionProps) {
           </button>
         )}
         <button
-          className="secondary-button"
+          className={`secondary-button${copied ? ' secondary-button--copied' : ''}`}
           type="button"
+          aria-label="Copy question link"
           onClick={() => void copyLink()}
         >
-          Copy question link
+          {copied && <span className="secondary-button__mark" aria-hidden="true" />}
+          <span>{copied ? 'Copied!' : 'Copy question link'}</span>
         </button>
       </div>
       <div className="share-feeds" aria-label="Share to a social feed">

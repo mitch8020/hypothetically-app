@@ -3,7 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router'
 import { useEffect, useState } from 'react'
 import {
   ApiError,
-  getPreviousUnansweredQuestion,
+  getRandomUnansweredQuestion,
   getResult,
 } from '../api'
 import { AnswerLine } from '../components/AnswerLine'
@@ -11,6 +11,7 @@ import { BacklogCta } from '../components/BacklogCta'
 import { Leaderboard } from '../components/Leaderboard'
 import { LockedResult } from '../components/LockedResult'
 import { QuestionCard } from '../components/QuestionCard'
+import { formatCompactNumber } from '../format'
 import type { QuestionResult } from '../types'
 import { ErrorState, LoadingState } from './StateRoutes'
 
@@ -20,12 +21,6 @@ interface ResultLocationState {
 }
 
 const MAX_TIMER_DELAY = 2_147_000_000
-
-function formatAverage(result: Extract<QuestionResult, { status: 'unlocked' }>) {
-  return new Intl.NumberFormat('en-US', {
-    maximumFractionDigits: 0,
-  }).format(result.average)
-}
 
 function formatGap(value: number, precision: number): string {
   return new Intl.NumberFormat('en-US', {
@@ -62,12 +57,10 @@ export function ResultsRoute() {
   const result = submittedResult ?? resultQuery.data
   const backlogQuery = useQuery({
     queryKey: [
-      'previous-unanswered',
-      result?.question.dayKey ?? 'before-today',
+      'random-unanswered',
       key,
     ],
-    queryFn: () =>
-      getPreviousUnansweredQuestion(result?.question.dayKey),
+    queryFn: () => getRandomUnansweredQuestion(key),
     enabled: Boolean(result),
     staleTime: 30_000,
     retry: false,
@@ -130,21 +123,22 @@ export function ResultsRoute() {
     <section className="results-page">
       <div className="result-intro">
         <QuestionCard question={result.question} compact />
-        <div className="average-board">
-          <span>The crowd average</span>
-          <strong>{formatAverage(result)}</strong>
+        <div className="median-board">
+          <span>The crowd median</span>
+          <strong>{formatCompactNumber(result.median)}</strong>
           <small>{result.question.unit}</small>
           <p>
             {result.answerCount === 1
               ? 'You set the first marker. The crowd starts here.'
-              : `Built from ${result.answerCount.toLocaleString()} locked answers.`}
+              : `Built from ${formatCompactNumber(result.answerCount)} locked answers.`}
           </p>
         </div>
       </div>
 
       <AnswerLine
-        average={result.average}
+        median={result.median}
         entries={answerLineEntries}
+        clusters={result.answerClusters}
         unit={result.question.unit}
       />
 
@@ -158,7 +152,7 @@ export function ResultsRoute() {
           <strong>
             ±
             {formatGap(
-              result.userEntry.distanceFromAverage,
+              result.userEntry.distanceFromMedian,
               result.question.precision,
             )}
           </strong>

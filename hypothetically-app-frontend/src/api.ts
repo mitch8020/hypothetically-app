@@ -1,4 +1,11 @@
-import type { PublicQuestion, PublicUser, QuestionResult } from './types'
+import type {
+  ArchiveResponse,
+  ArchiveStatus,
+  PublicQuestion,
+  PublicUser,
+  QuestionResult,
+  QuestionTopic,
+} from './types'
 
 interface ErrorBody {
   code?: string
@@ -120,6 +127,30 @@ export async function getPreviousUnansweredQuestion(
   return request<PublicQuestion>(
     `/api/questions/previous-unanswered${search}`,
   )
+}
+
+export async function getRandomUnansweredQuestion(
+  exclude?: string,
+): Promise<PublicQuestion | null> {
+  const search = exclude ? `?exclude=${encodeURIComponent(exclude)}` : ''
+  return request<PublicQuestion>(`/api/questions/random${search}`)
+}
+
+export async function getArchive(
+  status: ArchiveStatus = 'all',
+  topic: QuestionTopic | 'all' = 'all',
+): Promise<ArchiveResponse> {
+  const search = new URLSearchParams()
+  if (status !== 'all') search.set('status', status)
+  if (topic !== 'all') search.set('topic', topic)
+  const query = search.toString()
+  const archive = await request<ArchiveResponse>(
+    `/api/questions/archive${query ? `?${query}` : ''}`,
+  )
+  if (!archive) {
+    throw new ApiError('The archive did not arrive.', 500)
+  }
+  return archive
 }
 
 export async function getQuestion(key: string): Promise<PublicQuestion> {

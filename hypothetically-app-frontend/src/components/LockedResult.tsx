@@ -59,7 +59,8 @@ export function LockedResult({
             <span>your time</span>
           </div>
           <p>
-            The crowd average and leaderboard unlock at{' '}
+            The crowd median and leaderboard unlock at{' '}
+            <br></br>
             <strong>{unlockTime}</strong>.
           </p>
           <button
