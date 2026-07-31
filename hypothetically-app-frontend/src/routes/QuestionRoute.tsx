@@ -24,7 +24,7 @@ function inputHint(question: PublicQuestion): string {
   return `${precision} ${format.format(question.minimum)}–${format.format(question.maximum)} ${question.unit}.`
 }
 
-function validateAnswer(
+export function validateAnswer(
   question: PublicQuestion,
   rawValue: string,
 ): string | null {
@@ -101,8 +101,7 @@ export function QuestionRoute() {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!question) return
-    const validationMessage = validateAnswer(question, value)
+    const validationMessage = validateAnswer(question!, value)
     setClientError(validationMessage)
     if (!validationMessage) {
       answerMutation.mutate(Number(value))

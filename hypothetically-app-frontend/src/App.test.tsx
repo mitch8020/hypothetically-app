@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
   cleanup,
+  fireEvent,
   render,
   screen,
   waitFor,
@@ -598,5 +599,147 @@ describe('How Many, Though? experience', () => {
         screen.getByRole('heading', { name: olderQuestion.prompt }),
       ).toBeInTheDocument()
     })
+  })
+
+  it('validates blank, non-numeric, out-of-range, and fractional answers', async () => {
+    const decimalQuestion: PublicQuestion = {
+      ...question,
+      maximum: 10,
+      step: 0.5,
+      precision: 1,
+    }
+    installFetch((url) => {
+      if (url === '/api/auth/me') return json(currentUser())
+      if (url === `/api/questions/${question.key}`) return json(decimalQuestion)
+      throw new Error(`Unexpected request: ${url}`)
+    })
+    const user = userEvent.setup()
+    renderApp(`/q/${question.key}`)
+    const input = await screen.findByRole('spinbutton', { name: 'Your answer' })
+
+    await user.click(screen.getByRole('button', { name: 'Lock in my answer' }))
+    expect(await screen.findByText('Put a number on the board first.')).toBeInTheDocument()
+    fireEvent.change(input, { target: { value: '11' } })
+    await user.click(screen.getByRole('button', { name: 'Lock in my answer' }))
+    expect(await screen.findByText(/Keep it between/)).toBeInTheDocument()
+    fireEvent.change(input, { target: { value: '1.2' } })
+    await user.click(screen.getByRole('button', { name: 'Lock in my answer' }))
+    expect(await screen.findByText('Use increments of 0.5.')).toBeInTheDocument()
+  })
+
+  it('recovers today, missing-question, and sign-in loading failures', async () => {
+    let todayAttempts = 0
+    installFetch((url) => {
+      if (url === '/api/auth/me') return json({ user: null })
+      if (url === '/api/questions/today') {
+        todayAttempts += 1
+        return todayAttempts === 1
+          ? json({ message: 'not ready' }, 503)
+          : json(question)
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+    const user = userEvent.setup()
+    renderApp('/')
+    expect(await screen.findByRole('heading', { name: /Today.s question is still under/ })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(await screen.findByRole('heading', { name: question.prompt })).toBeInTheDocument()
+
+    cleanup()
+    installFetch((url) => {
+      if (url === '/api/auth/me') return json({ user: null })
+      if (url === '/api/questions/missing') return json({ message: 'gone' }, 404)
+      throw new Error(`Unexpected request: ${url}`)
+    })
+    renderApp('/q/missing')
+    await waitFor(
+      () => expect(screen.getByRole('heading', { name: /That question wandered off/ })).toBeInTheDocument(),
+      { timeout: 3_000 },
+    )
+    expect(screen.getByRole('link', { name: 'Draw another question' })).toBeInTheDocument()
+
+    cleanup()
+    let authAttempts = 0
+    installFetch((url) => {
+      if (url === '/api/auth/me') {
+        authAttempts += 1
+        return authAttempts <= 2 ? json({ message: 'auth unavailable' }, 503) : json({ user: null })
+      }
+      if (url === `/api/questions/${question.key}`) return json(question)
+      throw new Error(`Unexpected request: ${url}`)
+    })
+    renderApp(`/q/${question.key}`)
+    await waitFor(
+      () => expect(screen.getByRole('heading', { name: /lost the sign-in signal/ })).toBeInTheDocument(),
+      { timeout: 3_000 },
+    )
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(await screen.findByRole('link', { name: 'Sign in with Google' })).toBeInTheDocument()
+  })
+
+  it('handles protected and recoverable result errors and renders a non-current winner', async () => {
+    let resultAttempts = 0
+    const singleAnswerResult: QuestionResult = {
+      status: 'unlocked',
+      question,
+      average: 42,
+      answerCount: 1,
+      leaders: [{ rank: 1, displayName: 'Alex A.', value: 42, distanceFromAverage: 0, isCurrentUser: true }],
+      userEntry: { rank: 2, displayName: 'Jamie J.', value: 80, distanceFromAverage: 38, distanceToWinner: 38, isCurrentUser: false },
+      winningEntry: { rank: 1, displayName: 'Alex A.', value: 42, distanceFromAverage: 0, isCurrentUser: true },
+      computedAt: '2026-07-28T12:00:00.000Z',
+    }
+    installFetch((url) => {
+      if (url === '/api/auth/me') return json(currentUser())
+      if (url === resultUrl(question.key)) {
+        resultAttempts += 1
+        return resultAttempts === 1
+          ? json({ code: 'ANSWER_REQUIRED', message: 'answer first' }, 403)
+          : json(singleAnswerResult)
+      }
+      if (url === `/api/questions/${question.key}`) return json(question)
+      if (url === '/api/questions/previous-unanswered?before=2026-07-28') return json(null, 204)
+      throw new Error(`Unexpected request: ${url}`)
+    })
+    const user = userEvent.setup()
+    renderApp(`/q/${question.key}/results`)
+    expect(await screen.findByRole('heading', { name: 'Your answer comes first.' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(await screen.findByRole('heading', { name: question.prompt })).toBeInTheDocument()
+
+    cleanup()
+    resultAttempts = 0
+    installFetch((url) => {
+      if (url === '/api/auth/me') return json(currentUser())
+      if (url === resultUrl(question.key)) {
+        resultAttempts += 1
+        return resultAttempts === 1
+          ? json({ message: 'temporary failure' }, 500)
+          : json(singleAnswerResult)
+      }
+      if (url === '/api/questions/previous-unanswered?before=2026-07-28') return json(null, 204)
+      throw new Error(`Unexpected request: ${url}`)
+    })
+    renderApp(`/q/${question.key}/results`)
+    expect(await screen.findByRole('heading', { name: 'The numbers got crossed.' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(await screen.findByText('The crowd average')).toBeInTheDocument()
+
+    cleanup()
+    let lockedAttempts = 0
+    installFetch((url) => {
+      if (url === '/api/auth/me') return json(currentUser())
+      if (url === resultUrl(question.key)) {
+        lockedAttempts += 1
+        return lockedAttempts === 1
+          ? json(lockedResult)
+          : json({ message: 'still sealed' }, 503)
+      }
+      if (url === '/api/questions/previous-unanswered?before=2026-07-28') return json(null, 204)
+      throw new Error(`Unexpected request: ${url}`)
+    })
+    renderApp(`/q/${question.key}/results`)
+    await user.click(await screen.findByRole('button', { name: 'Check now' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('still sealed')
   })
 })
