@@ -53,6 +53,27 @@ describe('QuestionGenerationService', () => {
         }),
       }),
     );
+    const input = String(parse.mock.calls[0][0].input[1].content);
+    expect(input).toContain('- How many old prompts?');
+  });
+
+  it('includes the rejection context when retrying after a candidate failure', async () => {
+    parse.mockResolvedValue({
+      id: 'resp_retry',
+      model: 'gpt-5.6-luna',
+      output_parsed: {
+        prompt:
+          'How many soap bubbles could cover the surface of your bathtub?',
+        unit: 'bubbles',
+        answerStyle: 'whole',
+        maximum: 10_000_000,
+      },
+    });
+
+    await service.generate('2026-07-28', [], 'The previous wording was too close.');
+    const input = String(parse.mock.calls[0][0].input[1].content);
+    expect(input).toContain('The previous wording was too close.');
+    expect(input).toContain('- No prior generated questions yet.');
   });
 
   it('treats a refusal or missing parsed output as a generation failure', async () => {

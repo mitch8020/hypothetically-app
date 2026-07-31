@@ -40,6 +40,12 @@ describe('generated question validation', () => {
         maximum: 1_000_000_001,
       }).success,
     ).toBe(false);
+    expect(
+      validateGeneratedQuestion(
+        { ...VALID_CANDIDATE, prompt: 42 } as never,
+        [],
+      ),
+    ).toContain('structured numeric');
   });
 
   it('enforces safe wording and normalized similarity below 0.60', () => {
@@ -64,5 +70,18 @@ describe('generated question validation', () => {
         'How many stars might fit across the night sky?',
       ),
     ).toBeLessThan(0.6);
+    expect(
+      validateGeneratedQuestion(
+        { ...VALID_CANDIDATE, prompt: 'Estimate the number of bubbles in a tub?' },
+        [],
+      ),
+    ).toContain('How many');
+    expect(
+      validateGeneratedQuestion(
+        { ...VALID_CANDIDATE, unit: 'bubbles.' },
+        [],
+      ),
+    ).toContain('unit');
+    expect(normalizedTokenSimilarity('and the', 'of')).toBe(1);
   });
 });

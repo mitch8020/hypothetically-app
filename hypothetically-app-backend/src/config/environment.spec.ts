@@ -28,6 +28,39 @@ describe('environment validation', () => {
     );
   });
 
+  it('uses local defaults and test-only credentials when optional values are absent', () => {
+    expect(
+      validateEnvironment({
+        NODE_ENV: 'test',
+        MONGODB_URI: validEnvironment.MONGODB_URI,
+        SESSION_SECRET: validEnvironment.SESSION_SECRET,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        NODE_ENV: 'test',
+        PORT: 7000,
+        FRONTEND_URL: 'http://localhost:7073',
+        GOOGLE_CALLBACK_URL:
+          'http://localhost:7000/api/auth/google/callback',
+        GOOGLE_CLIENT_ID: 'test-google-client',
+        GOOGLE_CLIENT_SECRET: 'test-google-secret',
+        OPENAI_API_KEY: 'test-openai-key',
+      }),
+    );
+    expect(
+      validateEnvironment({
+        ...validEnvironment,
+        MONGODB_DNS_SERVERS: '   ',
+      }),
+    ).toHaveProperty('MONGODB_DNS_SERVERS', '   ');
+    expect(
+      validateEnvironment({
+        ...validEnvironment,
+        NODE_ENV: undefined,
+      }),
+    ).toEqual(expect.objectContaining({ NODE_ENV: 'development' }));
+  });
+
   it('rejects weak secrets, malformed URLs, and invalid DNS servers', () => {
     expect(() =>
       validateEnvironment({
@@ -53,5 +86,11 @@ describe('environment validation', () => {
         APP_TIME_ZONE: 'Central-ish',
       }),
     ).toThrow('APP_TIME_ZONE');
+    expect(() =>
+      validateEnvironment({ ...validEnvironment, PORT: 'not-a-number' }),
+    ).toThrow('PORT');
+    expect(() =>
+      validateEnvironment({ ...validEnvironment, PORT: '0' }),
+    ).toThrow('PORT');
   });
 });

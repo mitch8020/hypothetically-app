@@ -8,7 +8,7 @@ describe('TrafficService', () => {
   const exec = jest.fn().mockResolvedValue(undefined);
   const updateOne = jest.fn().mockReturnValue({ exec });
   const cookie = jest.fn();
-  const configValues: Record<string, string> = {
+  const configValues: Record<string, string | undefined> = {
     SESSION_SECRET: 'test-session-secret-at-least-32-characters',
     APP_TIME_ZONE: 'America/Chicago',
     NODE_ENV: 'test',
@@ -16,6 +16,8 @@ describe('TrafficService', () => {
   let service: TrafficService;
 
   beforeEach(() => {
+    configValues.APP_TIME_ZONE = 'America/Chicago';
+    configValues.NODE_ENV = 'test';
     exec.mockClear();
     updateOne.mockClear();
     cookie.mockClear();
@@ -84,5 +86,24 @@ describe('TrafficService', () => {
       expect.objectContaining({ httpOnly: true, sameSite: 'lax' }),
     );
     expect(rotatedHash).not.toBe(originalHash);
+  });
+
+  it('uses the default zone, production cookie security, and the default timestamp', async () => {
+    configValues.APP_TIME_ZONE = undefined;
+    configValues.NODE_ENV = 'production';
+    service = new TrafficService(
+      { updateOne } as unknown as Model<DailyVisit>,
+      {
+        getOrThrow: jest.fn((key: string) => configValues[key]),
+        get: jest.fn((key: string) => configValues[key]),
+      } as unknown as ConfigService,
+    );
+
+    await service.recordVisit(requestWithCookie(), response);
+    expect(cookie).toHaveBeenCalledWith(
+      'hmt.vid',
+      expect.any(String),
+      expect.objectContaining({ secure: true }),
+    );
   });
 });
