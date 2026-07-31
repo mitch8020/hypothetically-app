@@ -140,7 +140,7 @@ describe('QuestionsService integration', () => {
     const user = await makeUser('legacy', 'Legacy', 'L');
     const result = await service.submitAnswer('doors-opened', user, 10);
     assertUnlocked(result);
-    expect(result.average).toBe(10);
+    expect(result.median).toBe(10);
   });
 
   it('generates one Central-time question without a crowd-size threshold', async () => {
@@ -324,7 +324,7 @@ describe('QuestionsService integration', () => {
       unlocksAt: '2026-07-29T07:00:00.000Z',
       timeZone: 'America/Los_Angeles',
     });
-    expect(first).not.toHaveProperty('average');
+    expect(first).not.toHaveProperty('median');
     expect(first).not.toHaveProperty('leaders');
     expect(first).not.toHaveProperty('answerCount');
 
@@ -345,8 +345,12 @@ describe('QuestionsService integration', () => {
       instantBeforeLosAngelesMidnight,
     );
     assertUnlocked(tokyoResult);
-    expect(tokyoResult.average).toBeCloseTo(43.333333, 5);
+    expect(tokyoResult.median).toBe(20);
     expect(tokyoResult.answerCount).toBe(3);
+    expect(tokyoResult.answerClusters).toEqual([
+      { center: 15, count: 2, minimum: 10, maximum: 20 },
+      { center: 100, count: 1, minimum: 100, maximum: 100 },
+    ]);
     expect(tokyoResult.winningEntry).toMatchObject({
       rank: 1,
       displayName: 'Blair B.',
@@ -378,7 +382,7 @@ describe('QuestionsService integration', () => {
       new Date('2026-07-29T07:00:00.000Z'),
     );
     assertUnlocked(exactMidnight);
-    expect(exactMidnight.average).toBeCloseTo(43.333333, 5);
+    expect(exactMidnight.median).toBe(20);
   });
 
   it('locks the first answer and validates numeric precision', async () => {
@@ -402,6 +406,9 @@ describe('QuestionsService integration', () => {
     const result = await service.submitAnswer('one-foot-balance', user, 12);
     assertUnlocked(result);
     expect(result.userEntry.value).toBe(12);
+    await expect(
+      service.submitAnswer('one-foot-balance', user, 12),
+    ).resolves.toMatchObject({ status: 'unlocked' });
     await expect(
       service.submitAnswer('one-foot-balance', user, 13),
     ).rejects.toMatchObject({
@@ -492,6 +499,9 @@ describe('QuestionsService integration', () => {
         requiredAnswerCount: 1,
       },
     ]);
+    await expect(
+      service.findPreviousUnansweredQuestion(user, '2026-07-28'),
+    ).resolves.toMatchObject({ key: 'daily-2026-07-27' });
     const historical = await service.submitAnswer(
       'daily-2026-07-27',
       user,
@@ -504,6 +514,39 @@ describe('QuestionsService integration', () => {
     await expect(
       service.findPreviousUnansweredQuestion(user, '2026-07-28'),
     ).resolves.toMatchObject({ key: 'daily-2026-07-26' });
+  });
+
+  it('records rejected candidates and unknown generation failures for retry', async () => {
+    const now = new Date('2026-07-28T12:00:00.000Z');
+    generate.mockResolvedValue({
+      candidate: {
+        prompt: QUESTION_CATALOG[0].prompt,
+        unit: QUESTION_CATALOG[0].unit,
+        answerStyle: 'whole',
+        maximum: QUESTION_CATALOG[0].maximum,
+      },
+      model: 'gpt-5.6-luna',
+      responseId: 'resp_rejected',
+    });
+    await expect(service.findTodayQuestion(now)).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'DAILY_QUESTION_PENDING' }),
+    });
+    expect(generate).toHaveBeenCalledTimes(2);
+    await expect(
+      generationModel.findOne({ dayKey: '2026-07-28' }).lean().exec(),
+    ).resolves.toMatchObject({
+      status: 'failed',
+      lastErrorCode: expect.stringContaining('OPENAI_CANDIDATE_REJECTED'),
+    });
+
+    await Promise.all([questionModel.deleteMany({}), generationModel.deleteMany({})]);
+    generate.mockReset().mockRejectedValue('network failure');
+    await expect(service.findTodayQuestion(now)).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'DAILY_QUESTION_PENDING' }),
+    });
+    await expect(
+      generationModel.findOne({ dayKey: '2026-07-28' }).lean().exec(),
+    ).resolves.toMatchObject({ lastErrorCode: 'OPENAI_GENERATION_FAILED' });
   });
 
   it('hides results before the current user answers', async () => {

@@ -1,3 +1,5 @@
+import type { QuestionTopic } from './question-topic';
+
 export interface PublicQuestion {
   key: string;
   prompt: string;
@@ -9,13 +11,32 @@ export interface PublicQuestion {
   dayKey?: string;
 }
 
+export type ArchiveStatus = 'all' | 'answered' | 'unanswered';
+
+export interface ArchiveQuestion extends PublicQuestion {
+  topic: QuestionTopic;
+  answered: boolean;
+}
+
+export interface ArchiveResponse {
+  questions: ArchiveQuestion[];
+  total: number;
+}
+
 export interface LeaderboardEntry {
   rank: number;
   displayName: string;
   avatarUrl?: string;
   value: number;
-  distanceFromAverage: number;
+  distanceFromMedian: number;
   isCurrentUser: boolean;
+}
+
+export interface AnswerCluster {
+  center: number;
+  count: number;
+  minimum: number;
+  maximum: number;
 }
 
 export interface LockedQuestionResult {
@@ -29,8 +50,9 @@ export interface LockedQuestionResult {
 export interface UnlockedQuestionResult {
   status: 'unlocked';
   question: PublicQuestion;
-  average: number;
+  median: number;
   answerCount: number;
+  answerClusters: AnswerCluster[];
   leaders: LeaderboardEntry[];
   userEntry: LeaderboardEntry & { distanceToWinner: number };
   winningEntry: LeaderboardEntry;

@@ -13,6 +13,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { User } from '../users/schemas/user.schema';
 import { QUESTION_CATALOG } from './question.catalog';
+import { buildAnswerClusters } from './answer-clusters';
 import { validateGeneratedQuestion } from './question-candidate';
 import {
   canonicalTimeZone,
@@ -29,10 +30,16 @@ import {
 } from './question-generation.service';
 import {
   LeaderboardEntry,
+  ArchiveResponse,
   PublicQuestion,
   QuestionResult,
   UnlockedQuestionResult,
 } from './question.types';
+import {
+  isQuestionTopic,
+  QUESTION_TOPIC_VALUES,
+  questionTopic,
+} from './question-topic';
 import { Answer } from './schemas/answer.schema';
 import { Question, QuestionDocument } from './schemas/question.schema';
 import { QuestionGeneration } from './schemas/question-generation.schema';
@@ -120,12 +127,24 @@ export class QuestionsService implements OnApplicationBootstrap {
   }
 
   async findRandomQuestion(
-    _userId?: Types.ObjectId,
-    _excludeKey?: string,
-  ): Promise<PublicQuestion> {
-    void _userId;
-    void _excludeKey;
-    return this.findTodayQuestion();
+    user: Express.User,
+    excludeKey?: string,
+  ): Promise<PublicQuestion | null> {
+    const answeredQuestionIds = await this.answerModel
+      .distinct('question', { user: user._id })
+      .exec();
+    const questions = await this.questionModel
+      .find({
+        active: true,
+        ...(answeredQuestionIds.length
+          ? { _id: { $nin: answeredQuestionIds } }
+          : {}),
+        ...(excludeKey ? { key: { $ne: excludeKey } } : {}),
+      })
+      .exec();
+    if (questions.length === 0) return null;
+    const question = questions[Math.floor(Math.random() * questions.length)];
+    return this.toPublicQuestion(question);
   }
 
   async findPublicQuestion(key: string): Promise<PublicQuestion> {
@@ -154,6 +173,64 @@ export class QuestionsService implements OnApplicationBootstrap {
       .sort({ dayKey: -1 })
       .exec();
     return question ? this.toPublicQuestion(question) : null;
+  }
+
+  async findArchive(
+    user: Express.User,
+    status: string = 'all',
+    topic: string = 'all',
+    now = new Date(),
+  ): Promise<ArchiveResponse> {
+    if (!['all', 'answered', 'unanswered'].includes(status)) {
+      throw new BadRequestException({
+        code: 'INVALID_ARCHIVE_STATUS',
+        message: 'Choose all, answered, or unanswered questions.',
+      });
+    }
+    if (topic !== 'all' && !isQuestionTopic(topic)) {
+      throw new BadRequestException({
+        code: 'INVALID_ARCHIVE_TOPIC',
+        message: `Choose one of these topics: ${QUESTION_TOPIC_VALUES.join(', ')}.`,
+      });
+    }
+
+    const today = questionDayKey(now, this.timeZone);
+    const questions = await this.questionModel
+      .find({
+        active: true,
+        $or: [{ dayKey: { $lt: today } }, { dayKey: { $exists: false } }],
+      })
+      .sort({ dayKey: -1, createdAt: -1 })
+      .exec();
+    const questionIds = questions.map((question) => question._id);
+    const answers = await this.answerModel
+      .find({ user: user._id, question: { $in: questionIds } })
+      .select({ question: 1 })
+      .lean()
+      .exec();
+    const answeredIds = new Set(
+      answers.map((answer) => answer.question.toString()),
+    );
+
+    const archiveQuestions = questions
+      .map((question) => ({
+        ...this.toPublicQuestion(question),
+        topic: questionTopic(question),
+        answered: answeredIds.has(question._id.toString()),
+      }))
+      .filter((question) => {
+        const matchesStatus =
+          status === 'all' ||
+          (status === 'answered' && question.answered) ||
+          (status === 'unanswered' && !question.answered);
+        const matchesTopic = topic === 'all' || question.topic === topic;
+        return matchesStatus && matchesTopic;
+      });
+
+    return {
+      questions: archiveQuestions,
+      total: archiveQuestions.length,
+    };
   }
 
   async submitAnswer(
@@ -276,9 +353,7 @@ export class QuestionsService implements OnApplicationBootstrap {
         if (generationError) {
           throw new Error('OPENAI_GENERATION_FAILED');
         }
-        throw new Error(
-          `OPENAI_CANDIDATE_REJECTED:${rejectionReason ?? 'unknown'}`,
-        );
+        throw new Error(`OPENAI_CANDIDATE_REJECTED:${rejectionReason!}`);
       }
 
       const question = await this.createGeneratedQuestion(dayKey, generated);
@@ -533,9 +608,14 @@ export class QuestionsService implements OnApplicationBootstrap {
       .lean()
       .exec()) as unknown as PopulatedAnswer[];
 
-    const average =
-      answers.reduce((total, answer) => total + answer.value, 0) /
-      answers.length;
+    const sortedValues = answers
+      .map((answer) => answer.value)
+      .sort((left, right) => left - right);
+    const middleIndex = Math.floor(sortedValues.length / 2);
+    const median =
+      sortedValues.length % 2 === 1
+        ? sortedValues[middleIndex]
+        : (sortedValues[middleIndex - 1] + sortedValues[middleIndex]) / 2;
     const currentUserIdString = currentUserId.toString();
 
     const sortedEntries: RankedAnswer[] = answers
@@ -544,14 +624,14 @@ export class QuestionsService implements OnApplicationBootstrap {
         displayName: this.displayName(answer.user),
         ...(answer.user.avatarUrl ? { avatarUrl: answer.user.avatarUrl } : {}),
         value: answer.value,
-        distanceFromAverage: Math.abs(answer.value - average),
+        distanceFromMedian: Math.abs(answer.value - median),
         isCurrentUser: answer.user._id.toString() === currentUserIdString,
         createdAt: answer.createdAt,
         rank: 0,
       }))
       .sort(
         (left, right) =>
-          left.distanceFromAverage - right.distanceFromAverage ||
+          left.distanceFromMedian - right.distanceFromMedian ||
           left.createdAt.getTime() - right.createdAt.getTime() ||
           left.userId.localeCompare(right.userId),
       );
@@ -561,10 +641,10 @@ export class QuestionsService implements OnApplicationBootstrap {
     const ranked = sortedEntries.map((entry, index) => {
       const isTie =
         previousDistance !== undefined &&
-        Math.abs(entry.distanceFromAverage - previousDistance) < 1e-9;
+        Math.abs(entry.distanceFromMedian - previousDistance) < 1e-9;
       if (!isTie) {
         previousRank = index + 1;
-        previousDistance = entry.distanceFromAverage;
+        previousDistance = entry.distanceFromMedian;
       }
       return { ...entry, rank: previousRank };
     });
@@ -582,8 +662,9 @@ export class QuestionsService implements OnApplicationBootstrap {
     return {
       status: 'unlocked',
       question: this.toPublicQuestion(question),
-      average,
+      median,
       answerCount: answers.length,
+      answerClusters: buildAnswerClusters(sortedValues, question.step),
       leaders: ranked.slice(0, 5).map((entry) => this.publicEntry(entry)),
       userEntry: {
         ...this.publicEntry(currentUserEntry),
@@ -600,7 +681,7 @@ export class QuestionsService implements OnApplicationBootstrap {
       displayName: entry.displayName,
       ...(entry.avatarUrl ? { avatarUrl: entry.avatarUrl } : {}),
       value: entry.value,
-      distanceFromAverage: entry.distanceFromAverage,
+      distanceFromMedian: entry.distanceFromMedian,
       isCurrentUser: entry.isCurrentUser,
     };
   }

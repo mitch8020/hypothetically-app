@@ -126,7 +126,7 @@ describe('How Many, Though? API (e2e)', () => {
     await mongo.stop();
   });
 
-  it('serves health and one generated question through today and the compatibility alias', async () => {
+  it('serves health and one generated question through today', async () => {
     await request(app.getHttpServer()).get('/api/health').expect(200).expect({
       status: 'ok',
       service: 'hypothetically-app-backend',
@@ -147,12 +147,6 @@ describe('How Many, Though? API (e2e)', () => {
     expect(response.body).not.toHaveProperty('_id');
     todayKey = response.body.key as string;
 
-    await request(app.getHttpServer())
-      .get('/api/questions/random?exclude=ignored')
-      .expect(200)
-      .expect((aliasResponse) => {
-        expect(aliasResponse.body.key).toBe(todayKey);
-      });
   });
 
   it('deduplicates valid browser visits and rejects a tampered identity cookie', async () => {
@@ -202,6 +196,12 @@ describe('How Many, Though? API (e2e)', () => {
       .expect(403);
     await request(app.getHttpServer())
       .get('/api/questions/previous-unanswered?before=2026-07-28')
+      .expect(403);
+    await request(app.getHttpServer())
+      .get('/api/questions/random?exclude=ignored')
+      .expect(403);
+    await request(app.getHttpServer())
+      .get('/api/questions/archive')
       .expect(403);
   });
 
@@ -256,7 +256,7 @@ describe('How Many, Though? API (e2e)', () => {
         unlocksAt: expect.stringMatching(/T0[56]:00:00\.000Z$/),
       }),
     );
-    expect(submitted.body).not.toHaveProperty('average');
+    expect(submitted.body).not.toHaveProperty('median');
     expect(submitted.body).not.toHaveProperty('answerCount');
 
     await agent
@@ -279,7 +279,7 @@ describe('How Many, Though? API (e2e)', () => {
         expect(response.body.status).toBe('locked');
         expect(response.body.timeZone).toBe('America/Chicago');
         expect(response.body.question.key).toBe(todayKey);
-        expect(response.body).not.toHaveProperty('average');
+        expect(response.body).not.toHaveProperty('median');
       });
 
     await agent
@@ -355,8 +355,11 @@ describe('How Many, Though? API (e2e)', () => {
         expect(response.body).toEqual(
           expect.objectContaining({
             status: 'unlocked',
-            average: 12,
+            median: 12,
             answerCount: 1,
+            answerClusters: [
+              { center: 12, count: 1, minimum: 12, maximum: 12 },
+            ],
           }),
         );
         expect(response.body.leaders).toHaveLength(1);
@@ -387,7 +390,7 @@ describe('How Many, Though? API (e2e)', () => {
       .expect(200)
       .expect((response) => {
         expect(response.body.status).toBe('unlocked');
-        expect(response.body.average).toBe(16);
+        expect(response.body.median).toBe(16);
       });
   });
 
