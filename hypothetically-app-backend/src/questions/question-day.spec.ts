@@ -79,9 +79,54 @@ describe('question day rules', () => {
   });
 
   it('canonicalizes and rejects IANA time zones', () => {
-    expect(canonicalTimeZone('America/Chicago')).toBe('America/Chicago');
+    expect(canonicalTimeZone(' America/Chicago ')).toBe('America/Chicago');
+    expect(() => canonicalTimeZone('')).toThrow(
+      'Time zone must be a valid IANA time zone.',
+    );
     expect(() => canonicalTimeZone('Not/A_Zone')).toThrow(
       'Time zone must be a valid IANA time zone.',
     );
+  });
+
+  it('rejects malformed and impossible question day keys', () => {
+    expect(() => previousQuestionDay('2026-7-01')).toThrow(
+      'Question day keys must use YYYY-MM-DD.',
+    );
+    expect(() => nextQuestionDay('2026-02-30')).toThrow(
+      'Question day key is not a real calendar day.',
+    );
+    expect(() => dailyQuestionUnlockAt('2026-02-30', 'America/Chicago')).toThrow(
+      'Question day key is not a real calendar day.',
+    );
+  });
+
+  it('uses the default time zone and reports incomplete formatter output', () => {
+    expect(questionDayKey(new Date('2026-07-28T05:00:00.000Z'))).toBe(
+      '2026-07-28',
+    );
+    expect(isQuestionGenerationHour(new Date('2026-07-28T05:00:00.000Z'))).toBe(
+      true,
+    );
+
+    const formatter = {
+      formatToParts: jest.fn().mockReturnValue([]),
+    } as unknown as Intl.DateTimeFormat;
+    const dateTimeFormat = jest
+      .spyOn(Intl, 'DateTimeFormat')
+      .mockImplementation(() => formatter);
+    expect(() => questionDayKey(new Date())).toThrow(
+      'Could not calculate a calendar day',
+    );
+    expect(() => isQuestionGenerationHour(new Date())).toThrow(
+      'Could not calculate a local hour',
+    );
+    dateTimeFormat.mockRestore();
+  });
+
+  it('rewrites invalid application time zones with the application error', () => {
+    expect(() => {
+      const { assertTimeZone } = require('./question-day') as typeof import('./question-day');
+      assertTimeZone('Not/A_Zone');
+    }).toThrow('APP_TIME_ZONE must be a valid IANA time zone.');
   });
 });

@@ -23,6 +23,9 @@ describe('visitor identity', () => {
     expect(readCookie(undefined, VISITOR_COOKIE_NAME)).toBeUndefined();
     expect(readCookie('other=value', VISITOR_COOKIE_NAME)).toBeUndefined();
     expect(
+      readCookie(`malformed; ${VISITOR_COOKIE_NAME}=valid`, VISITOR_COOKIE_NAME),
+    ).toBe('valid');
+    expect(
       readCookie(`${VISITOR_COOKIE_NAME}=%E0%A4%A`, VISITOR_COOKIE_NAME),
     ).toBeUndefined();
   });
