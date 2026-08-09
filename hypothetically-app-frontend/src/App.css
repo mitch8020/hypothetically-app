@@ -869,7 +869,7 @@ main {
 .answer-line__track {
   position: relative;
   min-height: 100px;
-  height: clamp(100px, 24vw, 320px);
+  height: clamp(100px, 12vw, 100px);
   overflow: hidden;
   border-top: 3px solid var(--ink);
   border-bottom: 1px solid rgba(32, 36, 29, 0.16);
